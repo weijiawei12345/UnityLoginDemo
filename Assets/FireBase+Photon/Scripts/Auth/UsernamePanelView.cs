@@ -1,4 +1,3 @@
-using System;
 using ARPG.Auth;
 using TMPro;
 using UnityEngine;
@@ -10,61 +9,59 @@ using UnityEngine.UI;
 public sealed class UsernamePanelView : MonoBehaviour
 {
     private static UsernamePanelView _instance;
+    private const string UsernamePanelPrefabPath = "Prefabs/UI/UsernamePanel";
 
     private readonly UserNameController _userNameController = new UserNameController();
 
+    private Transform _uiRoot;
     private GameObject _usernamePanel;
     private TMP_InputField _nameInput;
     private Button _confirmButton;
     private TMP_Text _statusText;
     private bool _isSaving;
 
-    public static UsernamePanelView Instance
+    public static UsernamePanelView GetOrCreate(Transform uiRoot)
     {
-        get
+        if (uiRoot == null)
         {
-            if (_instance != null)
-            {
-                return _instance;
-            }
+            return null;
+        }
 
-            GameObject canvasObject = GameObject.Find("Canvas");
-            if (canvasObject == null)
-            {
-                throw new InvalidOperationException("Canvas was not found for UsernamePanelView.");
-            }
-
-            _instance = canvasObject.GetComponent<UsernamePanelView>();
+        if (_instance == null)
+        {
+            _instance = uiRoot.GetComponent<UsernamePanelView>();
             if (_instance == null)
             {
-                _instance = canvasObject.AddComponent<UsernamePanelView>();
+                _instance = uiRoot.gameObject.AddComponent<UsernamePanelView>();
             }
-
-            return _instance;
         }
+
+        _instance.Initialize(uiRoot);
+        return _instance;
     }
 
     private void Awake()
     {
         _instance = this;
-        AutoBind();
-        Hide();
     }
 
-    private void OnEnable()
-    {
-        if (_confirmButton != null)
-        {
-            _confirmButton.onClick.AddListener(OnConfirmClicked);
-        }
-    }
-
-    private void OnDisable()
+    private void OnDestroy()
     {
         if (_confirmButton != null)
         {
             _confirmButton.onClick.RemoveListener(OnConfirmClicked);
         }
+
+        if (_instance == this)
+        {
+            _instance = null;
+        }
+    }
+
+    private void Initialize(Transform uiRoot)
+    {
+        _uiRoot = uiRoot;
+        _statusText = GetDirectChildComponent<TMP_Text>(_uiRoot, "StatusText");
     }
 
     /// <summary>
@@ -97,14 +94,14 @@ public sealed class UsernamePanelView : MonoBehaviour
 
     private void Show()
     {
-        if (_usernamePanel == null || _nameInput == null || _confirmButton == null)
+        if (!LoadPanelIfNeeded())
         {
-            SetStatus("Username panel is not configured.");
             return;
         }
 
         SetStatus(string.Empty);
         _usernamePanel.SetActive(true);
+        SetButtonInteractable(true);
         _nameInput.text = string.Empty;
         _nameInput.Select();
         _nameInput.ActivateInputField();
@@ -134,16 +131,30 @@ public sealed class UsernamePanelView : MonoBehaviour
         Hide();
     }
 
-    private void AutoBind()
+    // 仅在确实需要设置昵称时加载预制体，场景中不保留 UsernamePanel 实例。
+    private bool LoadPanelIfNeeded()
     {
-        Transform panelTransform = FindDirectChild(transform, "UsernamePanel");
-        _usernamePanel = panelTransform != null ? panelTransform.gameObject : null;
-        _statusText = GetDirectChildComponent<TMP_Text>(transform, "StatusText");
-
-        if (_usernamePanel == null)
+        if (_usernamePanel != null)
         {
-            return;
+            return true;
         }
+
+        if (_uiRoot == null)
+        {
+            SetStatus("UI root is not configured.");
+            return false;
+        }
+
+        GameObject panelPrefab = Resources.Load<GameObject>(UsernamePanelPrefabPath);
+        if (panelPrefab == null)
+        {
+            SetStatus("Username panel prefab was not found.");
+            return false;
+        }
+
+        _usernamePanel = Instantiate(panelPrefab, _uiRoot);
+        _usernamePanel.name = panelPrefab.name;
+        _usernamePanel.SetActive(false);
 
         _nameInput = _usernamePanel.GetComponentInChildren<TMP_InputField>(true);
         Button[] buttons = _usernamePanel.GetComponentsInChildren<Button>(true);
@@ -155,6 +166,19 @@ public sealed class UsernamePanelView : MonoBehaviour
                 break;
             }
         }
+
+        if (_nameInput == null || _confirmButton == null)
+        {
+            Destroy(_usernamePanel);
+            _usernamePanel = null;
+            _nameInput = null;
+            _confirmButton = null;
+            SetStatus("Username panel prefab is incomplete.");
+            return false;
+        }
+
+        _confirmButton.onClick.AddListener(OnConfirmClicked);
+        return true;
     }
 
     private void SetStatus(string message)

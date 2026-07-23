@@ -34,6 +34,7 @@ public class AuthUIView : MonoBehaviour
     [SerializeField] private TMP_Text _statusText;
 
     private readonly AuthController _authController = new AuthController();
+    private UsernamePanelView _usernamePanelView;
     private bool _isFirebaseReady;
     private bool _isSubmitting;
 
@@ -44,6 +45,7 @@ public class AuthUIView : MonoBehaviour
         ConfigurePasswordField(_registerPasswordInput);
         ConfigurePasswordField(_confirmPasswordInput);
         HideAllInputTips();
+        _usernamePanelView = UsernamePanelView.GetOrCreate(transform);
     }
 
     private void OnEnable()
@@ -106,8 +108,8 @@ public class AuthUIView : MonoBehaviour
 
     private async void Start()
     {
-        // UsernamePanel 只在认证成功且 Firestore 中没有昵称时显示。
-        UsernamePanelView.Instance.Hide();
+        // UsernamePanel 只在认证成功且 Firestore 中没有昵称时才从 Resources 加载。
+        _usernamePanelView.Hide();
         ShowLogin();
         SetAuthButtonsInteractable(false);
 
@@ -203,7 +205,7 @@ public class AuthUIView : MonoBehaviour
         ShowLoginResult(result);
         if (result.Success)
         {
-            UsernamePanelView.Instance.CheckCurrentPlayerNameAsync();
+            _usernamePanelView.CheckCurrentPlayerNameAsync();
         }
     }
 
@@ -230,7 +232,7 @@ public class AuthUIView : MonoBehaviour
         {
             ShowLogin();
             SetStatus(result.Message);
-            UsernamePanelView.Instance.CheckCurrentPlayerNameAsync();
+            _usernamePanelView.CheckCurrentPlayerNameAsync();
         }
     }
 
