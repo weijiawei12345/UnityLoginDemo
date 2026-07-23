@@ -35,6 +35,7 @@ public class AuthUIView : MonoBehaviour
 
     private readonly AuthController _authController = new AuthController();
     private UsernamePanelView _usernamePanelView;
+    private LoadingOverlayView _loadingOverlay;
     private bool _isFirebaseReady;
     private bool _isSubmitting;
 
@@ -46,6 +47,7 @@ public class AuthUIView : MonoBehaviour
         ConfigurePasswordField(_confirmPasswordInput);
         HideAllInputTips();
         _usernamePanelView = UsernamePanelView.GetOrCreate(transform);
+        _loadingOverlay = LoadingOverlayView.GetOrCreate(transform);
     }
 
     private void OnEnable()
@@ -113,7 +115,17 @@ public class AuthUIView : MonoBehaviour
         ShowLogin();
         SetAuthButtonsInteractable(false);
 
-        FirebaseInitializationResult initialization = await FirebaseAuthManager.Instance.InitializeAsync();
+        _loadingOverlay.Show();
+        FirebaseInitializationResult initialization;
+        try
+        {
+            initialization = await FirebaseAuthManager.Instance.InitializeAsync();
+        }
+        finally
+        {
+            _loadingOverlay.Hide();
+        }
+
         _isFirebaseReady = initialization.Success;
         SetAuthButtonsInteractable(_isFirebaseReady);
 
@@ -195,13 +207,22 @@ public class AuthUIView : MonoBehaviour
         HideLoginInputTips();
         SetSubmitting(true);
 
-        AuthResult result = await _authController.LoginAsync(new LoginRequest
+        _loadingOverlay.Show();
+        AuthResult result;
+        try
         {
-            Email = _loginUserNameInput != null ? _loginUserNameInput.text : string.Empty,
-            Password = _loginPasswordInput != null ? _loginPasswordInput.text : string.Empty
-        });
+            result = await _authController.LoginAsync(new LoginRequest
+            {
+                Email = _loginUserNameInput != null ? _loginUserNameInput.text : string.Empty,
+                Password = _loginPasswordInput != null ? _loginPasswordInput.text : string.Empty
+            });
+        }
+        finally
+        {
+            _loadingOverlay.Hide();
+            SetSubmitting(false);
+        }
 
-        SetSubmitting(false);
         ShowLoginResult(result);
         if (result.Success)
         {
@@ -219,20 +240,34 @@ public class AuthUIView : MonoBehaviour
         HideRegisterInputTips();
         SetSubmitting(true);
 
-        AuthResult result = await _authController.RegisterAsync(new RegisterRequest
+        string registeredEmail = _registerUserNameInput != null ? _registerUserNameInput.text.Trim() : string.Empty;
+        _loadingOverlay.Show();
+        AuthResult result;
+        try
         {
-            Email = _registerUserNameInput != null ? _registerUserNameInput.text : string.Empty,
-            Password = _registerPasswordInput != null ? _registerPasswordInput.text : string.Empty,
-            ConfirmPassword = _confirmPasswordInput != null ? _confirmPasswordInput.text : string.Empty
-        });
+            result = await _authController.RegisterAsync(new RegisterRequest
+            {
+                Email = registeredEmail,
+                Password = _registerPasswordInput != null ? _registerPasswordInput.text : string.Empty,
+                ConfirmPassword = _confirmPasswordInput != null ? _confirmPasswordInput.text : string.Empty
+            });
+        }
+        finally
+        {
+            _loadingOverlay.Hide();
+            SetSubmitting(false);
+        }
 
-        SetSubmitting(false);
         ShowRegisterResult(result);
         if (result.Success)
         {
             ShowLogin();
+            if (_loginUserNameInput != null)
+            {
+                _loginUserNameInput.text = registeredEmail;
+            }
+
             SetStatus(result.Message);
-            _usernamePanelView.CheckCurrentPlayerNameAsync();
         }
     }
 

@@ -18,6 +18,7 @@ public sealed class UsernamePanelView : MonoBehaviour
     private TMP_InputField _nameInput;
     private Button _confirmButton;
     private TMP_Text _statusText;
+    private LoadingOverlayView _loadingOverlay;
     private bool _isSaving;
 
     public static UsernamePanelView GetOrCreate(Transform uiRoot)
@@ -62,6 +63,7 @@ public sealed class UsernamePanelView : MonoBehaviour
     {
         _uiRoot = uiRoot;
         _statusText = GetDirectChildComponent<TMP_Text>(_uiRoot, "StatusText");
+        _loadingOverlay = LoadingOverlayView.GetOrCreate(_uiRoot);
     }
 
     /// <summary>
@@ -71,7 +73,16 @@ public sealed class UsernamePanelView : MonoBehaviour
     {
         Hide();
 
-        UserNameResult result = await _userNameController.LoadCurrentPlayerNameAsync();
+        _loadingOverlay.Show();
+        UserNameResult result;
+        try
+        {
+            result = await _userNameController.LoadCurrentPlayerNameAsync();
+        }
+        finally
+        {
+            _loadingOverlay.Hide();
+        }
         if (!result.Success)
         {
             SetStatus(result.Message);
@@ -117,8 +128,17 @@ public sealed class UsernamePanelView : MonoBehaviour
         _isSaving = true;
         SetButtonInteractable(false);
 
-        UserNameResult result = await _userNameController.SaveCurrentPlayerNameAsync(_nameInput.text);
-        _isSaving = false;
+        _loadingOverlay.Show();
+        UserNameResult result;
+        try
+        {
+            result = await _userNameController.SaveCurrentPlayerNameAsync(_nameInput.text);
+        }
+        finally
+        {
+            _loadingOverlay.Hide();
+            _isSaving = false;
+        }
 
         if (!result.Success)
         {
