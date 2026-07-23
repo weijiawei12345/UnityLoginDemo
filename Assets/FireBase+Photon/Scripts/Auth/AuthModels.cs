@@ -51,14 +51,14 @@ namespace ARPG.Auth
     [Serializable]
     public class LoginRequest
     {
-        public string UserName;
+        public string Email;
         public string Password;
     }
 
     [Serializable]
     public class RegisterRequest
     {
-        public string UserName;
+        public string Email;
         public string Password;
         public string ConfirmPassword;
     }
@@ -69,7 +69,7 @@ namespace ARPG.Auth
     public enum AuthField
     {
         None = 0,
-        Account = 1,
+        Email = 1,
         Password = 2,
         ConfirmPassword = 3
     }

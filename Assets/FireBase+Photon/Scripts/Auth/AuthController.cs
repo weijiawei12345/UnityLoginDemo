@@ -1,91 +1,115 @@
+using System;
+using System.Threading.Tasks;
+using Firebase.Auth;
 using UnityEngine;
 
 namespace ARPG.Auth
 {
     /// <summary>
-    /// Auth Controller（纯 C#）：输入校验与占位登录/注册逻辑。
-    /// 阶段 3 将在此替换为 FirebaseAuthManager 异步调用。
+    /// Auth Controller：保留前端校验职责，并将 Firebase 的结果转换为业务数据。
     /// </summary>
     public class AuthController
     {
         public UserData CurrentUser { get; private set; }
 
-        public AuthResult Login(LoginRequest request)
+        public async Task<AuthResult> LoginAsync(LoginRequest request)
         {
             Debug.Log("[Login] Login button clicked");
 
-            if (request == null || string.IsNullOrWhiteSpace(request.UserName))
+            AuthResult validationResult = ValidateLoginRequest(request);
+            if (validationResult != null)
             {
-                Debug.LogWarning("[Login] Account is empty");
-                return AuthResult.Fail("Please enter your account or email.", AuthField.Account);
+                return validationResult;
             }
 
-            if (string.IsNullOrWhiteSpace(request.Password))
+            FirebaseAuthOperationResult firebaseResult = await FirebaseAuthManager.Instance.LoginAsync(
+                request.Email.Trim(), request.Password);
+            if (!firebaseResult.Success)
             {
-                Debug.LogWarning("[Login] Password is empty");
-                return AuthResult.Fail("Please enter your password.", AuthField.Password);
+                return AuthResult.Fail(firebaseResult.Message, AuthField.Email);
             }
 
-            if (request.Password.Length < 6)
-            {
-                Debug.LogWarning("[Login] Password too short");
-                return AuthResult.Fail("Password must be at least 6 characters.", AuthField.Password);
-            }
-
-            string account = request.UserName.Trim();
-            UserData user = UserData.CreateDefault($"local_{account.GetHashCode():X}", account);
-            user.TouchLastLogin();
-
-            CurrentUser = user;
-            UserSession.SetUser(user);
-
-            Debug.Log($"[Login] Login success (placeholder). user={user.Name}, uid={user.Uid}, level={user.Level}, coins={user.Coins}");
+            UserData user = CreateSessionUser(firebaseResult.User, request.Email);
+            Debug.Log($"[Login] Login success. user={user.Name}, uid={user.Uid}");
             return AuthResult.Ok(user, "Login successful.");
         }
 
-        public AuthResult Register(RegisterRequest request)
+        public async Task<AuthResult> RegisterAsync(RegisterRequest request)
         {
-            Debug.Log("[Login] Register button clicked");
+            Debug.Log("[Register] Register button clicked");
 
-            if (request == null || string.IsNullOrWhiteSpace(request.UserName))
+            AuthResult validationResult = ValidateRegisterRequest(request);
+            if (validationResult != null)
             {
-                Debug.LogWarning("[Register] Account is empty");
-                return AuthResult.Fail("Please enter your account or email.", AuthField.Account);
+                return validationResult;
             }
 
-            if (string.IsNullOrWhiteSpace(request.Password))
+            FirebaseAuthOperationResult firebaseResult = await FirebaseAuthManager.Instance.RegisterAsync(
+                request.Email.Trim(), request.Password);
+            if (!firebaseResult.Success)
             {
-                Debug.LogWarning("[Register] Password is empty");
-                return AuthResult.Fail("Please enter your password.", AuthField.Password);
+                return AuthResult.Fail(firebaseResult.Message, AuthField.Email);
             }
 
-            if (request.Password.Length < 6)
-            {
-                Debug.LogWarning("[Register] Password too short");
-                return AuthResult.Fail("Password must be at least 6 characters.", AuthField.Password);
-            }
-
-            if (request.Password != request.ConfirmPassword)
-            {
-                Debug.LogWarning("[Register] Password mismatch");
-                return AuthResult.Fail("Passwords do not match.", AuthField.ConfirmPassword);
-            }
-
-            string account = request.UserName.Trim();
-            UserData user = UserData.CreateDefault($"local_{account.GetHashCode():X}", account);
-
-            CurrentUser = user;
-            UserSession.SetUser(user);
-
-            Debug.Log($"[Register] Register success (placeholder). user={user.Name}, uid={user.Uid}");
-            return AuthResult.Ok(user, "Registration successful. Please log in.");
+            UserData user = CreateSessionUser(firebaseResult.User, request.Email);
+            Debug.Log($"[Register] Register success. user={user.Name}, uid={user.Uid}");
+            return AuthResult.Ok(user, "Registration successful.");
         }
 
         public void SignOut()
         {
+            FirebaseAuthManager.Instance.SignOut();
             CurrentUser = null;
             UserSession.Clear();
-            Debug.Log("[Login] SignOut");
+            Debug.Log("[Auth] Sign out.");
+        }
+
+        private static AuthResult ValidateLoginRequest(LoginRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Email))
+            {
+                return AuthResult.Fail("Please enter your email.", AuthField.Email);
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                return AuthResult.Fail("Please enter your password.", AuthField.Password);
+            }
+
+            return null;
+        }
+
+        private static AuthResult ValidateRegisterRequest(RegisterRequest request)
+        {
+            AuthResult loginValidation = ValidateLoginRequest(request == null
+                ? null
+                : new LoginRequest { Email = request.Email, Password = request.Password });
+            if (loginValidation != null)
+            {
+                return loginValidation;
+            }
+
+            if (request.Password.Length < 6)
+            {
+                return AuthResult.Fail("Password must be at least 6 characters.", AuthField.Password);
+            }
+
+            if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
+            {
+                return AuthResult.Fail("Passwords do not match.", AuthField.ConfirmPassword);
+            }
+
+            return null;
+        }
+
+        // 阶段 3 只维护认证会话；等级、金币等字段将在阶段 4 从 Firestore 读取。
+        private UserData CreateSessionUser(FirebaseUser firebaseUser, string fallbackEmail)
+        {
+            string email = string.IsNullOrWhiteSpace(firebaseUser.Email) ? fallbackEmail.Trim() : firebaseUser.Email;
+            UserData user = UserData.CreateDefault(firebaseUser.UserId, email);
+            CurrentUser = user;
+            UserSession.SetUser(user);
+            return user;
         }
     }
 }

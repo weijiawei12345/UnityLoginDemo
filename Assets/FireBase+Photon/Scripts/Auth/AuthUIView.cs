@@ -34,6 +34,8 @@ public class AuthUIView : MonoBehaviour
     [SerializeField] private TMP_Text _statusText;
 
     private readonly AuthController _authController = new AuthController();
+    private bool _isFirebaseReady;
+    private bool _isSubmitting;
 
     private void Awake()
     {
@@ -102,9 +104,19 @@ public class AuthUIView : MonoBehaviour
         UnbindInputSelect(_confirmPasswordInput, HideConfirmPasswordTip);
     }
 
-    private void Start()
+    private async void Start()
     {
         ShowLogin();
+        SetAuthButtonsInteractable(false);
+
+        FirebaseInitializationResult initialization = await FirebaseAuthManager.Instance.InitializeAsync();
+        _isFirebaseReady = initialization.Success;
+        SetAuthButtonsInteractable(_isFirebaseReady);
+
+        if (!_isFirebaseReady)
+        {
+            SetStatus(initialization.Message);
+        }
     }
 
     public void ShowLogin()
@@ -169,30 +181,44 @@ public class AuthUIView : MonoBehaviour
         field.DeactivateInputField();
     }
 
-    public void OnLoginClicked()
+    public async void OnLoginClicked()
     {
-        HideLoginInputTips();
-
-        AuthResult result = _authController.Login(new LoginRequest
+        if (!_isFirebaseReady || _isSubmitting)
         {
-            UserName = _loginUserNameInput != null ? _loginUserNameInput.text : string.Empty,
+            return;
+        }
+
+        HideLoginInputTips();
+        SetSubmitting(true);
+
+        AuthResult result = await _authController.LoginAsync(new LoginRequest
+        {
+            Email = _loginUserNameInput != null ? _loginUserNameInput.text : string.Empty,
             Password = _loginPasswordInput != null ? _loginPasswordInput.text : string.Empty
         });
 
+        SetSubmitting(false);
         ShowLoginResult(result);
     }
 
-    public void OnRegisterClicked()
+    public async void OnRegisterClicked()
     {
-        HideRegisterInputTips();
-
-        AuthResult result = _authController.Register(new RegisterRequest
+        if (!_isFirebaseReady || _isSubmitting)
         {
-            UserName = _registerUserNameInput != null ? _registerUserNameInput.text : string.Empty,
+            return;
+        }
+
+        HideRegisterInputTips();
+        SetSubmitting(true);
+
+        AuthResult result = await _authController.RegisterAsync(new RegisterRequest
+        {
+            Email = _registerUserNameInput != null ? _registerUserNameInput.text : string.Empty,
             Password = _registerPasswordInput != null ? _registerPasswordInput.text : string.Empty,
             ConfirmPassword = _confirmPasswordInput != null ? _confirmPasswordInput.text : string.Empty
         });
 
+        SetSubmitting(false);
         ShowRegisterResult(result);
         if (result.Success)
         {
@@ -240,7 +266,7 @@ public class AuthUIView : MonoBehaviour
     {
         switch (field)
         {
-            case AuthField.Account:
+            case AuthField.Email:
                 SetInputTip(isLogin ? _loginAccountTip : _registerAccountTip, message);
                 break;
             case AuthField.Password:
@@ -350,6 +376,29 @@ public class AuthUIView : MonoBehaviour
 
         _statusText.gameObject.SetActive(!string.IsNullOrEmpty(message));
         _statusText.text = message ?? string.Empty;
+    }
+
+    // 认证请求期间锁定所有认证按钮，避免用户重复点击创建多个 Firebase 请求。
+    private void SetSubmitting(bool submitting)
+    {
+        _isSubmitting = submitting;
+        SetAuthButtonsInteractable(_isFirebaseReady && !submitting);
+    }
+
+    private void SetAuthButtonsInteractable(bool interactable)
+    {
+        SetButtonInteractable(_loginButton, interactable);
+        SetButtonInteractable(_goRegisterButton, interactable);
+        SetButtonInteractable(_registerButton, interactable);
+        SetButtonInteractable(_goLoginButton, interactable);
+    }
+
+    private static void SetButtonInteractable(Button button, bool interactable)
+    {
+        if (button != null)
+        {
+            button.interactable = interactable;
+        }
     }
 
     private void AutoBindIfNeeded()
