@@ -106,6 +106,8 @@ public class AuthUIView : MonoBehaviour
 
     private async void Start()
     {
+        // UsernamePanel 只在认证成功且 Firestore 中没有昵称时显示。
+        UsernamePanelView.Instance.Hide();
         ShowLogin();
         SetAuthButtonsInteractable(false);
 
@@ -199,6 +201,10 @@ public class AuthUIView : MonoBehaviour
 
         SetSubmitting(false);
         ShowLoginResult(result);
+        if (result.Success)
+        {
+            UsernamePanelView.Instance.CheckCurrentPlayerNameAsync();
+        }
     }
 
     public async void OnRegisterClicked()
@@ -224,6 +230,7 @@ public class AuthUIView : MonoBehaviour
         {
             ShowLogin();
             SetStatus(result.Message);
+            UsernamePanelView.Instance.CheckCurrentPlayerNameAsync();
         }
     }
 
