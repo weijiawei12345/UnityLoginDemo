@@ -67,7 +67,9 @@ namespace ARPG.Auth
                 return FirebaseAuthOperationResult.Fail(initialization.Message);
             }
 
-            return await ExecuteAuthTask(_auth.CreateUserWithEmailAndPasswordAsync(email, password));
+            return await ExecuteAuthTask(
+                _auth.CreateUserWithEmailAndPasswordAsync(email, password),
+                "Registration failed. Please try again.");
         }
 
         public async Task<FirebaseAuthOperationResult> LoginAsync(string email, string password)
@@ -78,7 +80,9 @@ namespace ARPG.Auth
                 return FirebaseAuthOperationResult.Fail(initialization.Message);
             }
 
-            return await ExecuteAuthTask(_auth.SignInWithEmailAndPasswordAsync(email, password));
+            return await ExecuteAuthTask(
+                _auth.SignInWithEmailAndPasswordAsync(email, password),
+                "Incorrect email or password.");
         }
 
         public void SignOut()
@@ -114,7 +118,9 @@ namespace ARPG.Auth
             }
         }
 
-        private static async Task<FirebaseAuthOperationResult> ExecuteAuthTask(Task<Firebase.Auth.AuthResult> authTask)
+        private static async Task<FirebaseAuthOperationResult> ExecuteAuthTask(
+            Task<Firebase.Auth.AuthResult> authTask,
+            string defaultErrorMessage)
         {
             try
             {
@@ -123,18 +129,19 @@ namespace ARPG.Auth
             }
             catch (FirebaseException exception)
             {
-                Debug.LogWarning($"[FirebaseAuth] Authentication failed: {exception.ErrorCode}");
-                return FirebaseAuthOperationResult.Fail(GetFriendlyErrorMessage((AuthError)exception.ErrorCode));
+                Debug.LogWarning($"[FirebaseAuth] Authentication failed: {exception.ErrorCode}. {exception.Message}");
+                return FirebaseAuthOperationResult.Fail(
+                    GetFriendlyErrorMessage((AuthError)exception.ErrorCode, defaultErrorMessage));
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
-                return FirebaseAuthOperationResult.Fail("Authentication failed. Please try again.");
+                return FirebaseAuthOperationResult.Fail(defaultErrorMessage);
             }
         }
 
-        // 不将 Firebase 原始异常直接展示给玩家，统一转换为可读的英文提示。
-        private static string GetFriendlyErrorMessage(AuthError error)
+        // Firebase 可能将错误密码包装为通用凭据异常，因此登录操作有专用兜底文案。
+        private static string GetFriendlyErrorMessage(AuthError error, string defaultErrorMessage)
         {
             switch (error)
             {
@@ -144,16 +151,16 @@ namespace ARPG.Auth
                     return "This email is already in use.";
                 case AuthError.WeakPassword:
                     return "Password must be at least 6 characters.";
+                case AuthError.InvalidCredential:
                 case AuthError.WrongPassword:
-                    return "Incorrect email or password.";
                 case AuthError.UserNotFound:
-                    return "No account was found for this email.";
+                    return "Incorrect email or password.";
                 case AuthError.NetworkRequestFailed:
                     return "Network error. Please check your connection.";
                 case AuthError.TooManyRequests:
                     return "Too many attempts. Please try again later.";
                 default:
-                    return "Authentication failed. Please try again.";
+                    return defaultErrorMessage;
             }
         }
     }
