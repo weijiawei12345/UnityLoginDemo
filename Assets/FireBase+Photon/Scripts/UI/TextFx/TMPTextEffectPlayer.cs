@@ -151,63 +151,69 @@ namespace GameUI.TextFx
                 return;
             }
 
-            var states = CreateStates(_chars, preset, startAlpha: 0f);
-            _masterSequence = DOTween.Sequence().SetUpdate(_manualUpdate ? UpdateType.Manual : UpdateType.Normal, preset.IgnoreTimeScale).SetTarget(_text);
+            bool useFade = preset.FadeInDuration > 0f || preset.FadeOutDuration > 0f;
+            var states = CreateStates(_chars, preset, startAlpha: useFade ? 0f : 1f);
+            bool ignoreTimeScale = preset.IgnoreTimeScale;
+            UpdateType updateType = _manualUpdate ? UpdateType.Manual : UpdateType.Normal;
+            _masterSequence = DOTween.Sequence().SetUpdate(updateType, ignoreTimeScale).SetTarget(_text);
+
+            // 循环时若开启了淡入但未配淡出，自动补同等时长淡出，否则下一轮看不到淡入。
+            // FadeInDuration=0 且 FadeOutDuration=0 表示关闭逐字透明度动画，只保留跳动。
+            float fadeOutDuration = ResolveLoopFadeOutDuration(preset, loop);
+            float moveSpan = preset.UseAnimationCurve ? preset.Duration : preset.Duration * 2f;
 
             for (int i = 0; i < states.Count; i++)
             {
                 CharState state = states[i];
                 float at = i * preset.CharDelay;
-                Sequence charSeq = DOTween.Sequence().SetUpdate(_manualUpdate ? UpdateType.Manual : UpdateType.Normal, preset.IgnoreTimeScale);
 
                 Vector3 endPos = new Vector3(0f, preset.JumpHeight, 0f);
-                Color endColor = preset.ChangeColor ? preset.EndColor : WithAlpha(state.Color, 1f);
-                Color startColor = WithAlpha(endColor, 0f);
+                Color endColor = preset.ChangeColor ? preset.EndColor : WithAlpha(state.OriColor, 1f);
+                Color startColor = useFade ? WithAlpha(endColor, 0f) : endColor;
                 state.Color = startColor;
                 state.Pos = Vector3.zero;
 
-                Tweener move = DOTween.To(() => state.Pos, x => state.Pos = x, endPos, preset.Duration)
-                    .SetUpdate(_manualUpdate ? UpdateType.Manual : UpdateType.Normal, preset.IgnoreTimeScale);
-                ApplyMoveEase(move, preset);
+                // 直接 Insert 到 master，避免嵌套 Sequence 导致短 tween 在 Restart 时不复位
+                _masterSequence.InsertCallback(at, () =>
+                {
+                    state.Color = startColor;
+                    state.Pos = Vector3.zero;
+                });
 
-                // Jump up then return to origin within same duration via curve, or yoyo half.
+                Tweener move = DOTween.To(() => state.Pos, x => state.Pos = x, endPos, preset.Duration)
+                    .SetUpdate(updateType, ignoreTimeScale);
+                ApplyMoveEase(move, preset);
                 if (!preset.UseAnimationCurve)
                 {
                     move.SetLoops(2, LoopType.Yoyo);
                 }
 
-                Tweener fadeIn = DOTween.To(() => state.Color, x => state.Color = x, endColor, preset.FadeInDuration)
-                    .SetUpdate(_manualUpdate ? UpdateType.Manual : UpdateType.Normal, preset.IgnoreTimeScale);
-                ApplyFadeEase(fadeIn, preset);
+                _masterSequence.Insert(at, move);
+                _tweens.Add(move);
 
-                charSeq.Insert(0f, move);
-                charSeq.Insert(0f, fadeIn);
-
-                if (preset.FadeOutDuration > 0f)
+                if (preset.FadeInDuration > 0f)
                 {
-                    Color fadeOutColor = WithAlpha(endColor, 0f);
-                    Tweener fadeOut = DOTween.To(() => state.Color, x => state.Color = x, fadeOutColor, preset.FadeOutDuration)
-                        .SetUpdate(_manualUpdate ? UpdateType.Manual : UpdateType.Normal, preset.IgnoreTimeScale);
-                    ApplyFadeEase(fadeOut, preset);
-                    charSeq.Insert(Mathf.Max(preset.Duration, preset.FadeInDuration), fadeOut);
+                    Tweener fadeIn = DOTween.To(() => state.Color, x => state.Color = x, endColor, preset.FadeInDuration)
+                        .From(startColor)
+                        .SetUpdate(updateType, ignoreTimeScale);
+                    ApplyFadeEase(fadeIn, preset);
+                    _masterSequence.Insert(at, fadeIn);
+                    _tweens.Add(fadeIn);
                 }
 
-                charSeq.OnUpdate(() =>
+                if (fadeOutDuration > 0f)
                 {
-                    TMPTextMeshUtility.SetVertexPosition(
-                        _text,
-                        state.MaterialIndex,
-                        state.VertexIndex,
-                        state.Pos,
-                        state.OriPos,
-                        state.Color,
-                        preset.ChangeColor);
-                    TMPTextMeshUtility.ApplyMesh(_text);
-                });
-
-                _masterSequence.Insert(at, charSeq);
-                _tweens.Add(charSeq);
+                    Color fadeOutColor = WithAlpha(endColor, 0f);
+                    float fadeOutAt = at + Mathf.Max(moveSpan, Mathf.Max(0f, preset.FadeInDuration));
+                    Tweener fadeOut = DOTween.To(() => state.Color, x => state.Color = x, fadeOutColor, fadeOutDuration)
+                        .SetUpdate(updateType, ignoreTimeScale);
+                    ApplyFadeEase(fadeOut, preset);
+                    _masterSequence.Insert(fadeOutAt, fadeOut);
+                    _tweens.Add(fadeOut);
+                }
             }
+
+            _masterSequence.OnUpdate(() => ApplyAllCharMeshes(states, preset.ChangeColor));
 
             if (loop)
             {
@@ -224,9 +230,10 @@ namespace GameUI.TextFx
             }
 
             var states = CreateStates(_chars, preset, startAlpha: 0f);
-            _masterSequence = DOTween.Sequence().SetUpdate(_manualUpdate ? UpdateType.Manual : UpdateType.Normal, preset.IgnoreTimeScale).SetTarget(_text);
+            bool ignoreTimeScale = preset.IgnoreTimeScale;
+            UpdateType updateType = _manualUpdate ? UpdateType.Manual : UpdateType.Normal;
+            _masterSequence = DOTween.Sequence().SetUpdate(updateType, ignoreTimeScale).SetTarget(_text);
 
-            // Hide all verts immediately.
             for (int i = 0; i < states.Count; i++)
             {
                 CharState state = states[i];
@@ -237,39 +244,86 @@ namespace GameUI.TextFx
 
             TMPTextMeshUtility.ApplyMesh(_text);
 
+            float fadeOutDuration = ResolveLoopFadeOutDuration(preset, loop);
+            float holdDuration = Mathf.Max(0f, preset.Duration);
+
             for (int i = 0; i < states.Count; i++)
             {
                 CharState state = states[i];
                 float at = i * preset.CharDelay;
                 Color endColor = preset.ChangeColor ? preset.EndColor : WithAlpha(state.OriColor, 1f);
+                Color startColor = WithAlpha(endColor, 0f);
 
-                Tweener fadeIn = DOTween.To(() => state.Color, x => state.Color = x, endColor, preset.FadeInDuration)
-                    .SetUpdate(_manualUpdate ? UpdateType.Manual : UpdateType.Normal, preset.IgnoreTimeScale);
-                ApplyFadeEase(fadeIn, preset);
-
-                Sequence charSeq = DOTween.Sequence().SetUpdate(_manualUpdate ? UpdateType.Manual : UpdateType.Normal, preset.IgnoreTimeScale);
-                charSeq.Insert(0f, fadeIn);
-                charSeq.OnUpdate(() =>
+                if (preset.FadeInDuration > 0f)
                 {
-                    TMPTextMeshUtility.SetVertexPosition(
-                        _text,
-                        state.MaterialIndex,
-                        state.VertexIndex,
-                        Vector3.zero,
-                        state.OriPos,
-                        state.Color,
-                        true);
-                    TMPTextMeshUtility.ApplyMesh(_text);
-                });
+                    _masterSequence.InsertCallback(at, () => { state.Color = startColor; });
+                    Tweener fadeIn = DOTween.To(() => state.Color, x => state.Color = x, endColor, preset.FadeInDuration)
+                        .From(startColor)
+                        .SetUpdate(updateType, ignoreTimeScale);
+                    ApplyFadeEase(fadeIn, preset);
+                    _masterSequence.Insert(at, fadeIn);
+                    _tweens.Add(fadeIn);
+                }
+                else
+                {
+                    state.Color = endColor;
+                    _masterSequence.InsertCallback(at, () => { state.Color = endColor; });
+                }
 
-                _masterSequence.Insert(at, charSeq);
-                _tweens.Add(charSeq);
+                if (fadeOutDuration > 0f)
+                {
+                    Color fadeOutColor = WithAlpha(endColor, 0f);
+                    float fadeOutAt = at + Mathf.Max(0f, preset.FadeInDuration) + holdDuration;
+                    Tweener fadeOut = DOTween.To(() => state.Color, x => state.Color = x, fadeOutColor, fadeOutDuration)
+                        .SetUpdate(updateType, ignoreTimeScale);
+                    ApplyFadeEase(fadeOut, preset);
+                    _masterSequence.Insert(fadeOutAt, fadeOut);
+                    _tweens.Add(fadeOut);
+                }
             }
+
+            _masterSequence.OnUpdate(() => ApplyAllCharMeshes(states, changeColor: true));
 
             if (loop)
             {
                 _masterSequence.SetLoops(-1, LoopType.Restart);
             }
+        }
+
+        /// <summary>
+        /// 循环播放时保证有淡出：否则淡入结束后 alpha 停在 1，下一轮看不到淡入。
+        /// </summary>
+        private static float ResolveLoopFadeOutDuration(TMPTextEffectPreset preset, bool loop)
+        {
+            if (preset.FadeOutDuration > 0f)
+            {
+                return preset.FadeOutDuration;
+            }
+
+            if (loop && preset.FadeInDuration > 0f)
+            {
+                return preset.FadeInDuration;
+            }
+
+            return 0f;
+        }
+
+        private void ApplyAllCharMeshes(List<CharState> states, bool changeColor)
+        {
+            for (int i = 0; i < states.Count; i++)
+            {
+                CharState state = states[i];
+                TMPTextMeshUtility.SetVertexPosition(
+                    _text,
+                    state.MaterialIndex,
+                    state.VertexIndex,
+                    state.Pos,
+                    state.OriPos,
+                    state.Color,
+                    changeColor);
+            }
+
+            TMPTextMeshUtility.ApplyMesh(_text);
         }
 
         private void PlayWave(TMPTextEffectPreset preset, bool loop)
