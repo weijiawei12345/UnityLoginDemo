@@ -134,6 +134,14 @@ public class AuthUIView : MonoBehaviour
         {
             SetStatus(initialization.Message);
         }
+        else
+        {
+            string kickMessage = AuthKickNotice.Consume();
+            if (!string.IsNullOrEmpty(kickMessage))
+            {
+                ShowFieldTip(AuthField.Email, kickMessage, isLogin: true);
+            }
+        }
     }
 
     public void ShowLogin()

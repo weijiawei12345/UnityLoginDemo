@@ -93,21 +93,24 @@ namespace ARPG.Auth
     }
 
     /// <summary>
-    /// 运行时当前用户会话（内存态；后续可接 Firebase / PlayerPrefs）。
+    /// 运行时当前用户会话（内存态；含 Firestore 单点登录 sessionId）。
     /// </summary>
     public static class UserSession
     {
         public static UserData Current { get; private set; }
+        public static string ActiveSessionId { get; private set; }
         public static bool IsLoggedIn => Current != null && !string.IsNullOrEmpty(Current.Uid);
 
-        public static void SetUser(UserData user)
+        public static void SetUser(UserData user, string sessionId = null)
         {
             Current = user;
+            ActiveSessionId = sessionId;
         }
 
         public static void Clear()
         {
             Current = null;
+            ActiveSessionId = null;
         }
     }
 }

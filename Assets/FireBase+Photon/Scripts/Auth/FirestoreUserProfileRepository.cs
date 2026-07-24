@@ -20,10 +20,6 @@ namespace ARPG.Auth
         private const string UsersCollection = "Users";
         private const string NameField = "name";
 
-        private static FirebaseFirestore _firestore;
-        private static bool _firestoreConfigured;
-        private static readonly object ConfigureLock = new object();
-
         public async Task<UserNameResult> LoadNameAsync(string uid)
         {
             if (string.IsNullOrWhiteSpace(uid))
@@ -31,7 +27,7 @@ namespace ARPG.Auth
                 return UserNameResult.Fail("The player session is invalid.");
             }
 
-            if (!await EnsureFirebaseReadyAsync())
+            if (!await FirestoreClient.EnsureReadyAsync())
             {
                 return UserNameResult.Fail("Firebase is not available. Please try again later.");
             }
@@ -72,7 +68,7 @@ namespace ARPG.Auth
                 return UserNameResult.Fail("The player session is invalid.");
             }
 
-            if (!await EnsureFirebaseReadyAsync())
+            if (!await FirestoreClient.EnsureReadyAsync())
             {
                 return UserNameResult.Fail("Firebase is not available. Please try again later.");
             }
@@ -102,46 +98,9 @@ namespace ARPG.Auth
             }
         }
 
-        private static async Task<bool> EnsureFirebaseReadyAsync()
-        {
-            FirebaseInitializationResult initialization = await FirebaseAuthManager.Instance.InitializeAsync();
-            return initialization.Success;
-        }
-
         private static DocumentReference GetUserDocument(string uid)
         {
-            return GetFirestore().Collection(UsersCollection).Document(uid);
-        }
-
-        /// <summary>
-        /// 获取并配置 Firestore 单例。
-        /// PersistenceEnabled 必须在任何读写之前设为 false，否则 Windows 包上可能原生闪退。
-        /// </summary>
-        private static FirebaseFirestore GetFirestore()
-        {
-            if (_firestoreConfigured && _firestore != null)
-            {
-                return _firestore;
-            }
-
-            lock (ConfigureLock)
-            {
-                if (_firestoreConfigured && _firestore != null)
-                {
-                    return _firestore;
-                }
-
-                Debug.Log("[Firestore] Acquiring FirebaseFirestore.DefaultInstance...");
-                _firestore = FirebaseFirestore.DefaultInstance;
-
-                // Desktop beta 关键稳定手段：关闭 LevelDB 本地持久化。
-                // 必须在第一次 GetSnapshot/Set 之前设置。
-                _firestore.Settings.PersistenceEnabled = false;
-                _firestoreConfigured = true;
-                Debug.Log("[Firestore] DefaultInstance ready. PersistenceEnabled=false");
-            }
-
-            return _firestore;
+            return FirestoreClient.Get().Collection(UsersCollection).Document(uid);
         }
     }
 

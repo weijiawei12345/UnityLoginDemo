@@ -7,9 +7,12 @@ namespace ARPG.Auth
 {
     /// <summary>
     /// Auth Controller：保留前端校验职责，并将 Firebase 的结果转换为业务数据。
+    /// 登录成功后强制占用 Firestore 会话（顶号：踢掉旧端）。
     /// </summary>
     public class AuthController
     {
+        private readonly FirestoreAuthSessionRepository _sessionRepository = new FirestoreAuthSessionRepository();
+
         public UserData CurrentUser { get; private set; }
 
         public async Task<AuthResult> LoginAsync(LoginRequest request)
@@ -29,7 +32,19 @@ namespace ARPG.Auth
                 return AuthResult.Fail(firebaseResult.Message, AuthField.Email);
             }
 
-            UserData user = CreateSessionUser(firebaseResult.User, request.Email);
+            string sessionId = Guid.NewGuid().ToString("N");
+            AuthSessionResult sessionResult = await _sessionRepository.ForceAcquireAsync(
+                firebaseResult.User.UserId,
+                sessionId);
+            if (!sessionResult.Success)
+            {
+                FirebaseAuthManager.Instance.SignOut();
+                Debug.LogWarning($"[Login] Session acquire failed: {sessionResult.Message}");
+                return AuthResult.Fail(sessionResult.Message, AuthField.Email);
+            }
+
+            UserData user = CreateSessionUser(firebaseResult.User, request.Email, sessionId);
+            AuthSessionGuard.Begin(user.Uid, sessionId);
             Debug.Log($"[Login] Login success. user={user.Name}, uid={user.Uid}");
             return AuthResult.Ok(user, "Login successful.");
         }
@@ -51,17 +66,24 @@ namespace ARPG.Auth
                 return AuthResult.Fail(firebaseResult.Message, AuthField.Email);
             }
 
-            UserData user = CreateSessionUser(firebaseResult.User, request.Email);
-            Debug.Log($"[Register] Register success. user={user.Name}, uid={user.Uid}");
-            return AuthResult.Ok(user, "Registration successful.");
+            // 注册成功后回到登录页，不占用在线会话。
+            FirebaseAuthManager.Instance.SignOut();
+            Debug.Log($"[Register] Register success. email={request.Email.Trim()}");
+            return AuthResult.Ok(null, "Registration successful.");
         }
 
-        public void SignOut()
+        public async Task SignOutAsync()
         {
+            await AuthSessionGuard.EndAsync();
             FirebaseAuthManager.Instance.SignOut();
             CurrentUser = null;
             UserSession.Clear();
             Debug.Log("[Auth] Sign out.");
+        }
+
+        public void SignOut()
+        {
+            _ = SignOutAsync();
         }
 
         private static AuthResult ValidateLoginRequest(LoginRequest request)
@@ -102,13 +124,12 @@ namespace ARPG.Auth
             return null;
         }
 
-        // 阶段 3 只维护认证会话；等级、金币等字段将在阶段 4 从 Firestore 读取。
-        private UserData CreateSessionUser(FirebaseUser firebaseUser, string fallbackEmail)
+        private UserData CreateSessionUser(FirebaseUser firebaseUser, string fallbackEmail, string sessionId)
         {
             string email = string.IsNullOrWhiteSpace(firebaseUser.Email) ? fallbackEmail.Trim() : firebaseUser.Email;
             UserData user = UserData.CreateDefault(firebaseUser.UserId, email);
             CurrentUser = user;
-            UserSession.SetUser(user);
+            UserSession.SetUser(user, sessionId);
             return user;
         }
     }
