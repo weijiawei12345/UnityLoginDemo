@@ -103,8 +103,17 @@ namespace GameUI.TextFx
         private void PlayLoadingDots(TMPTextEffectPreset preset, bool loop)
         {
             string baseText = string.IsNullOrEmpty(preset.DotsBaseText) ? "Loading" : preset.DotsBaseText;
+            baseText = baseText.TrimEnd('.', '…', '．');
+            if (string.IsNullOrEmpty(baseText))
+            {
+                baseText = "Loading";
+            }
+
             _text.text = baseText;
             _text.alpha = 1f;
+            // 动态追加 "." 时禁止 Ellipsis 裁剪，否则末尾点会被 TMP 吃掉
+            _text.enableWordWrapping = false;
+            _text.overflowMode = TextOverflowModes.Overflow;
 
             float interval = Mathf.Max(0.05f, preset.DotsInterval);
             Sequence dots = DOTween.Sequence()

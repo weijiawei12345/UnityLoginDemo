@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "413352915978",
+    "project_id": "unitytest-8f8bd",
+    "storage_bucket": "unitytest-8f8bd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:413352915978:android:9e79df90dcf355b7479bf3",
+        "android_client_info": {
+          "package_name": "com.MyCompany.LoginDemo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqo2HBxWG119jJ1sJEDOAtvSK94M3HWTQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Preset:
     EffectType: 0
-    DisplayText: Loading
+    DisplayText: Loading...
     Duration: 0.6
     CharDelay: 0.07
     FadeInDuration: 0.11

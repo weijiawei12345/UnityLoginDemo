@@ -20,7 +20,7 @@ public sealed class LoadingOverlayView : MonoBehaviour
     [Tooltip("未指定 Preset Asset 时，使用内置模板类型。")]
     [SerializeField] private TMPTextEffectType _loadingEffectType = TMPTextEffectType.BounceJump;
 
-    [SerializeField] private string _loadingTextContent = "Loading";
+    [SerializeField] private string _loadingTextContent = "Loading...";
 
     [Tooltip("若未拖 Asset，尝试从 Resources/TextFx/LoadingOverlayEffect 加载。")]
     [SerializeField] private bool _tryLoadFromResources = true;
@@ -154,6 +154,9 @@ public sealed class LoadingOverlayView : MonoBehaviour
         _loadingText.alignment = TextAlignmentOptions.Center;
         _loadingText.color = Color.white;
         _loadingText.raycastTarget = false;
+        // 避免 Overflow=Ellipsis 时把末尾 "..." 裁掉或替换成不可见省略符
+        _loadingText.enableWordWrapping = false;
+        _loadingText.overflowMode = TextOverflowModes.Overflow;
 
         _textAnimator = textObject.AddComponent<TMPTextAnimator>();
 
@@ -189,16 +192,22 @@ public sealed class LoadingOverlayView : MonoBehaviour
         if (asset != null)
         {
             TMPTextEffectPreset fromAsset = asset.CreateRuntimeCopy();
-            if (string.IsNullOrEmpty(fromAsset.DisplayText) && !string.IsNullOrEmpty(_loadingTextContent))
+
+            // 加载页文案以 LoadingOverlayView 配置为准，避免 Asset 里的 "Loading" 覆盖掉 "Loading..."
+            if (!string.IsNullOrEmpty(_loadingTextContent))
             {
                 fromAsset.DisplayText = _loadingTextContent;
+                if (fromAsset.EffectType == TMPTextEffectType.LoadingDots)
+                {
+                    fromAsset.DotsBaseText = TrimTrailingDots(_loadingTextContent);
+                }
             }
-
-            if (fromAsset.EffectType == TMPTextEffectType.LoadingDots &&
-                string.IsNullOrEmpty(fromAsset.DotsBaseText) &&
-                !string.IsNullOrEmpty(_loadingTextContent))
+            else if (fromAsset.EffectType == TMPTextEffectType.LoadingDots)
             {
-                fromAsset.DotsBaseText = _loadingTextContent;
+                string dotsBase = string.IsNullOrEmpty(fromAsset.DotsBaseText)
+                    ? fromAsset.DisplayText
+                    : fromAsset.DotsBaseText;
+                fromAsset.DotsBaseText = TrimTrailingDots(dotsBase);
             }
 
             return fromAsset;
@@ -207,13 +216,24 @@ public sealed class LoadingOverlayView : MonoBehaviour
         return BuildBuiltinPreset(_loadingEffectType, _loadingTextContent);
     }
 
+    private static string TrimTrailingDots(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return "Loading";
+        }
+
+        // 去掉末尾 ASCII "." 与 Unicode 省略号 "…"，避免 LoadingDots 叠加成 Loading......
+        return text.TrimEnd('.', '…', '．');
+    }
+
     private static TMPTextEffectPreset BuildBuiltinPreset(TMPTextEffectType type, string text)
     {
         string content = string.IsNullOrEmpty(text) ? "Loading" : text;
         switch (type)
         {
             case TMPTextEffectType.LoadingDots:
-                return TMPTextEffectPreset.DefaultLoadingDots(content);
+                return TMPTextEffectPreset.DefaultLoadingDots(TrimTrailingDots(content));
             case TMPTextEffectType.TypewriterFade:
                 return TMPTextEffectPreset.DefaultTypewriter(content);
             case TMPTextEffectType.Wave:

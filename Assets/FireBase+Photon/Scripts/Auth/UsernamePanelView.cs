@@ -1,4 +1,6 @@
+using System;
 using ARPG.Auth;
+using ARPG.Player;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,14 +14,18 @@ public sealed class UsernamePanelView : MonoBehaviour
     private const string UsernamePanelPrefabPath = "Prefabs/UI/UsernamePanel";
 
     private readonly UserNameController _userNameController = new UserNameController();
+    private readonly PlayerNameSyncController _playerNameSyncController = new PlayerNameSyncController();
 
     private Transform _uiRoot;
     private GameObject _usernamePanel;
     private TMP_InputField _nameInput;
     private Button _confirmButton;
     private TMP_Text _statusText;
+    private TMP_Text _inputTip;
     private LoadingOverlayView _loadingOverlay;
     private bool _isSaving;
+    private bool _renameMode;
+    private Action _onProfileReadyForPlay;
 
     public static UsernamePanelView GetOrCreate(Transform uiRoot)
     {
@@ -67,12 +73,20 @@ public sealed class UsernamePanelView : MonoBehaviour
     }
 
     /// <summary>
-    /// 认证成功后调用。只有 Firestore 中没有有效昵称时才显示面板。
+    /// 认证成功后调用。已有昵称则立刻回调；没有则弹面板，保存成功后再回调（用于进入 Play）。
+    /// Firestore 托管失败时：若会话里已有可用展示名则降级进 Play，避免卡在登录页。
+    /// 注意：原生层硬崩无法被 try/catch 捕获，依赖 Repository 关闭 Persistence。
     /// </summary>
-    public async void CheckCurrentPlayerNameAsync()
+    /// <param name="onProfileReadyForPlay">昵称就绪，可进 Play</param>
+    /// <param name="onAborted">无法自动继续（需用户停留在登录流程）</param>
+    public async void CheckCurrentPlayerNameAsync(
+        Action onProfileReadyForPlay = null,
+        Action onAborted = null)
     {
         Hide();
+        _onProfileReadyForPlay = onProfileReadyForPlay;
 
+        Debug.Log("[Profile] CheckCurrentPlayerNameAsync begin.");
         _loadingOverlay.Show();
         UserNameResult result;
         try
@@ -83,16 +97,43 @@ public sealed class UsernamePanelView : MonoBehaviour
         {
             _loadingOverlay.Hide();
         }
+
+        Debug.Log($"[Profile] Load finished. success={result.Success}, hasName={result.HasName}, message={result.Message}");
+
         if (!result.Success)
         {
+            // 托管失败：尽量用会话名进游戏，而不是卡死在登录页。
+            if (HasUsableSessionName())
+            {
+                Debug.LogWarning($"[Profile] Firestore load failed, fallback to session name and enter Play. reason={result.Message}");
+                SetStatus(result.Message);
+                NotifyProfileReadyForPlay();
+                return;
+            }
+
             SetStatus(result.Message);
+            _onProfileReadyForPlay = null;
+            onAborted?.Invoke();
             return;
         }
 
-        if (!result.HasName)
+        if (result.HasName)
         {
-            Show();
+            NotifyProfileReadyForPlay();
+            return;
         }
+
+        // 需要用户首次起名：解锁登录 UI 提交锁，只保留昵称面板。
+        onAborted?.Invoke();
+        _renameMode = false;
+        Show();
+    }
+
+    private static bool HasUsableSessionName()
+    {
+        return UserSession.IsLoggedIn
+            && UserSession.Current != null
+            && !string.IsNullOrWhiteSpace(UserSession.Current.Name);
     }
 
     public void Hide()
@@ -101,6 +142,33 @@ public sealed class UsernamePanelView : MonoBehaviour
         {
             _usernamePanel.SetActive(false);
         }
+
+        _renameMode = false;
+    }
+
+    /// <summary>
+    /// Play 场景改名：复用 UsernamePanel，确认后持久化并同步 NetworkPlayer。
+    /// </summary>
+    public void ShowForRename()
+    {
+        _renameMode = true;
+        Show();
+
+        if (_nameInput == null)
+        {
+            return;
+        }
+
+        bool hasSessionName = UserSession.IsLoggedIn
+            && UserSession.Current != null
+            && !string.IsNullOrWhiteSpace(UserSession.Current.Name);
+
+        _nameInput.text = hasSessionName
+            ? UserSession.Current.Name.Trim()
+            : string.Empty;
+
+        _nameInput.Select();
+        _nameInput.ActivateInputField();
     }
 
     private void Show()
@@ -113,7 +181,12 @@ public sealed class UsernamePanelView : MonoBehaviour
         SetStatus(string.Empty);
         _usernamePanel.SetActive(true);
         SetButtonInteractable(true);
-        _nameInput.text = string.Empty;
+
+        if (!_renameMode)
+        {
+            _nameInput.text = string.Empty;
+        }
+
         _nameInput.Select();
         _nameInput.ActivateInputField();
     }
@@ -132,7 +205,9 @@ public sealed class UsernamePanelView : MonoBehaviour
         UserNameResult result;
         try
         {
-            result = await _userNameController.SaveCurrentPlayerNameAsync(_nameInput.text);
+            result = _renameMode
+                ? await _playerNameSyncController.RenameAndSyncAsync(_nameInput.text)
+                : await _userNameController.SaveCurrentPlayerNameAsync(_nameInput.text);
         }
         finally
         {
@@ -148,7 +223,20 @@ public sealed class UsernamePanelView : MonoBehaviour
         }
 
         Debug.Log($"[Profile] Player name saved: {result.Name}");
+        bool shouldEnterPlay = !_renameMode;
         Hide();
+
+        if (shouldEnterPlay)
+        {
+            NotifyProfileReadyForPlay();
+        }
+    }
+
+    private void NotifyProfileReadyForPlay()
+    {
+        Action callback = _onProfileReadyForPlay;
+        _onProfileReadyForPlay = null;
+        callback?.Invoke();
     }
 
     // 仅在确实需要设置昵称时加载预制体，场景中不保留 UsernamePanel 实例。
@@ -177,6 +265,7 @@ public sealed class UsernamePanelView : MonoBehaviour
         _usernamePanel.SetActive(false);
 
         _nameInput = _usernamePanel.GetComponentInChildren<TMP_InputField>(true);
+        _inputTip = FindChildComponentByName<TMP_Text>(_usernamePanel.transform, "InputTip");
         Button[] buttons = _usernamePanel.GetComponentsInChildren<Button>(true);
         foreach (Button button in buttons)
         {
@@ -203,13 +292,20 @@ public sealed class UsernamePanelView : MonoBehaviour
 
     private void SetStatus(string message)
     {
-        if (_statusText == null)
+        string text = message ?? string.Empty;
+        bool hasMessage = !string.IsNullOrEmpty(text);
+
+        if (_statusText != null)
         {
-            return;
+            _statusText.text = text;
+            _statusText.gameObject.SetActive(hasMessage);
         }
 
-        _statusText.text = message ?? string.Empty;
-        _statusText.gameObject.SetActive(!string.IsNullOrEmpty(message));
+        if (_inputTip != null)
+        {
+            _inputTip.text = text;
+            _inputTip.gameObject.SetActive(hasMessage);
+        }
     }
 
     private void SetButtonInteractable(bool interactable)
@@ -238,5 +334,24 @@ public sealed class UsernamePanelView : MonoBehaviour
     {
         Transform child = FindDirectChild(parent, childName);
         return child != null ? child.GetComponent<T>() : null;
+    }
+
+    private static T FindChildComponentByName<T>(Transform root, string childName) where T : Component
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        T[] components = root.GetComponentsInChildren<T>(true);
+        foreach (T component in components)
+        {
+            if (component.name == childName)
+            {
+                return component;
+            }
+        }
+
+        return null;
     }
 }

@@ -1,4 +1,5 @@
 using ARPG.Auth;
+using ARPG.GameFlow;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -226,7 +227,37 @@ public class AuthUIView : MonoBehaviour
         ShowLoginResult(result);
         if (result.Success)
         {
-            _usernamePanelView.CheckCurrentPlayerNameAsync();
+            SetSubmitting(true);
+            Debug.Log("[Login] Auth success, start profile check before Play.");
+            _usernamePanelView.CheckCurrentPlayerNameAsync(
+                EnterPlayScene,
+                () => SetSubmitting(false));
+        }
+    }
+
+    private async void EnterPlayScene()
+    {
+        Debug.Log("[Login] EnterPlayScene begin.");
+        if (_loadingOverlay != null)
+        {
+            _loadingOverlay.Show();
+        }
+
+        try
+        {
+            await GameSceneController.LoadPlaySceneAsync();
+            Debug.Log("[Login] EnterPlayScene load requested.");
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogException(exception);
+            if (_loadingOverlay != null)
+            {
+                _loadingOverlay.Hide();
+            }
+
+            SetSubmitting(false);
+            SetStatus("Failed to enter the game scene.");
         }
     }
 
