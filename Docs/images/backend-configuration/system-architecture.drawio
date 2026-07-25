@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="29.7.9">
+  <diagram name="系统架构" id="system-architecture">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="720" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="tier-client" value="Unity 客户端" style="swimlane;startSize=36;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="260" height="520" as="geometry" />
+        </mxCell>
+        <mxCell id="n-unity" value="Unity 2022.3.62f2&#xa;LoginMenu / Play" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="tier-client">
+          <mxGeometry x="30" y="60" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="n-auth-app" value="Auth&#xa;Firebase / Firestore / Session" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;" vertex="1" parent="tier-client">
+          <mxGeometry x="30" y="170" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="n-player" value="Player / GameFlow&#xa;NetworkPlayer · 场景切换" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="tier-client">
+          <mxGeometry x="30" y="280" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="n-fusion-sdk" value="Photon Fusion SDK&#xa;Shared Mode" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="tier-client">
+          <mxGeometry x="30" y="390" width="200" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="tier-firebase" value="Firebase BaaS（直连，无自建 API）" style="swimlane;startSize=36;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=16;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="380" y="40" width="420" height="520" as="geometry" />
+        </mxCell>
+        <mxCell id="n-fb-auth" value="Firebase Authentication&#xa;邮箱/密码" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;" vertex="1" parent="tier-firebase">
+          <mxGeometry x="40" y="70" width="340" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="n-firestore" value="Cloud Firestore&#xa;Users/{uid}&#xa;name · activeSessionId · sessionOnline · heartbeat" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="tier-firebase">
+          <mxGeometry x="70" y="200" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="n-rules" value="安全规则&#xa;request.auth.uid == uid" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" vertex="1" parent="tier-firebase">
+          <mxGeometry x="70" y="380" width="280" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="tier-photon" value="Photon Cloud" style="swimlane;startSize=36;html=1;fillColor=#fff2cc;strokeColor=#d79b00;fontStyle=1;fontSize=16;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="880" y="40" width="320" height="520" as="geometry" />
+        </mxCell>
+        <mxCell id="n-photon" value="Photon Cloud&#xa;Fusion · Lobbies V2 · FixedRegion hk" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" vertex="1" parent="tier-photon">
+          <mxGeometry x="40" y="160" width="240" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="n-peers" value="其他在线玩家&#xa;房间与状态同步" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="tier-photon">
+          <mxGeometry x="40" y="320" width="240" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="Firebase Unity SDK&#xa;注册 / 登录 / 登出" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-auth-app" target="n-fb-auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="Firestore SDK&#xa;档案 · Listen 顶号 · 心跳兜底" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-auth-app" target="n-firestore">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="340" y="245" />
+              <mxPoint x="340" y="282" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="规则授权" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-rules" target="n-firestore">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="Fusion SDK&#xa;实时联机" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.85;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-fusion-sdk" target="n-photon">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="340" y="465" />
+              <mxPoint x="340" y="580" />
+              <mxPoint x="840" y="580" />
+              <mxPoint x="840" y="276" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="房间 / 昵称同步" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-photon" target="n-peers">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-unity" target="n-auth-app">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-auth-app" target="n-player">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-player" target="n-fusion-sdk">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note" value="两条独立链路：Firebase（身份/档案/会话）与 Photon（实时房间），无自建 REST/GraphQL/WebSocket 后端。" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="620" width="1160" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
