@@ -13,13 +13,11 @@ namespace ARPG.Auth
     {
         private readonly FirestoreAuthSessionRepository _sessionRepository = new FirestoreAuthSessionRepository();
 
-        public UserData CurrentUser { get; private set; }
-
         public async Task<AuthResult> LoginAsync(LoginRequest request)
         {
             Debug.Log("[Login] Login button clicked");
 
-            AuthResult validationResult = ValidateLoginRequest(request);
+            AuthResult validationResult = AuthRequestValidator.ValidateLogin(request);
             if (validationResult != null)
             {
                 return validationResult;
@@ -53,7 +51,7 @@ namespace ARPG.Auth
         {
             Debug.Log("[Register] Register button clicked");
 
-            AuthResult validationResult = ValidateRegisterRequest(request);
+            AuthResult validationResult = AuthRequestValidator.ValidateRegistration(request);
             if (validationResult != null)
             {
                 return validationResult;
@@ -76,7 +74,6 @@ namespace ARPG.Auth
         {
             await AuthSessionGuard.EndAsync();
             FirebaseAuthManager.Instance.SignOut();
-            CurrentUser = null;
             UserSession.Clear();
             Debug.Log("[Auth] Sign out.");
         }
@@ -86,49 +83,10 @@ namespace ARPG.Auth
             _ = SignOutAsync();
         }
 
-        private static AuthResult ValidateLoginRequest(LoginRequest request)
-        {
-            if (request == null || string.IsNullOrWhiteSpace(request.Email))
-            {
-                return AuthResult.Fail("Please enter your email.", AuthField.Email);
-            }
-
-            if (string.IsNullOrWhiteSpace(request.Password))
-            {
-                return AuthResult.Fail("Please enter your password.", AuthField.Password);
-            }
-
-            return null;
-        }
-
-        private static AuthResult ValidateRegisterRequest(RegisterRequest request)
-        {
-            AuthResult loginValidation = ValidateLoginRequest(request == null
-                ? null
-                : new LoginRequest { Email = request.Email, Password = request.Password });
-            if (loginValidation != null)
-            {
-                return loginValidation;
-            }
-
-            if (request.Password.Length < 6)
-            {
-                return AuthResult.Fail("Password must be at least 6 characters.", AuthField.Password);
-            }
-
-            if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
-            {
-                return AuthResult.Fail("Passwords do not match.", AuthField.ConfirmPassword);
-            }
-
-            return null;
-        }
-
         private UserData CreateSessionUser(FirebaseUser firebaseUser, string fallbackEmail, string sessionId)
         {
             string email = string.IsNullOrWhiteSpace(firebaseUser.Email) ? fallbackEmail.Trim() : firebaseUser.Email;
             UserData user = UserData.CreateDefault(firebaseUser.UserId, email);
-            CurrentUser = user;
             UserSession.SetUser(user, sessionId);
             return user;
         }

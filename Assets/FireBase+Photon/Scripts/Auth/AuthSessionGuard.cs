@@ -63,6 +63,7 @@ namespace ARPG.Auth
                 return;
             }
 
+            // 当前断线策略会释放 Firestore 租约；是否自动重连属于网络状态机改造，本次只记录边界。
             _ = _instance.ReleaseInternalAsync();
         }
 

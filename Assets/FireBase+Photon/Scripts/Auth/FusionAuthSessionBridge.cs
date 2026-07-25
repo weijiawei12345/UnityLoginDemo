@@ -53,6 +53,7 @@ namespace ARPG.Auth
             AuthSessionGuard.NotifyPhotonOffline();
         }
 
+        // INetworkRunnerCallbacks 要求实现完整接口；空回调表示该事件不影响当前会话租约生命周期。
         public void OnPlayerJoined(NetworkRunner runner, PlayerRef player) { }
         public void OnPlayerLeft(NetworkRunner runner, PlayerRef player) { }
         public void OnInput(NetworkRunner runner, NetworkInput input) { }

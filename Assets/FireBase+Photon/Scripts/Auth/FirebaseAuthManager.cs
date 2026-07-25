@@ -51,6 +51,7 @@ namespace ARPG.Auth
         /// </summary>
         public Task<FirebaseInitializationResult> InitializeAsync()
         {
+            // 初始化任务被缓存以避免重复依赖检查；失败重试策略属于后续可靠性改造，不在本次低风险重构中改变。
             if (_initializationTask == null)
             {
                 _initializationTask = InitializeInternalAsync();

@@ -8,6 +8,7 @@
 [Uu]ser[Ss]ettings/
 .vs/
 .vscode/
+.worktrees/
 *.pidb
 *.booproj
 *.svd

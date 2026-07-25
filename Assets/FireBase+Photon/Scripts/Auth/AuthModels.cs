@@ -93,7 +93,9 @@ namespace ARPG.Auth
     }
 
     /// <summary>
-    /// 运行时当前用户会话（内存态；含 Firestore 单点登录 sessionId）。
+    /// 当前进程唯一的认证会话状态。
+    /// Firebase 用户、Firestore 单点登录租约和网络展示名都从这里读取；
+    /// 业务代码不得再维护第二份当前用户副本。
     /// </summary>
     public static class UserSession
     {
@@ -103,6 +105,7 @@ namespace ARPG.Auth
 
         public static void SetUser(UserData user, string sessionId = null)
         {
+            // 登录成功后一次性写入用户与租约 ID，避免调用方分别更新两个状态字段。
             Current = user;
             ActiveSessionId = sessionId;
         }
