@@ -1,5 +1,4 @@
 using ARPG.Auth;
-using ARPG.GameFlow;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,6 +34,8 @@ public class AuthUIView : MonoBehaviour
     [SerializeField] private TMP_Text _statusText;
 
     private readonly AuthController _authController = new AuthController();
+    private AuthFormBindings _formBindings;
+    private AuthLoginFlowCoordinator _loginFlowCoordinator;
     private UsernamePanelView _usernamePanelView;
     private LoadingOverlayView _loadingOverlay;
     private bool _isFirebaseReady;
@@ -43,12 +44,33 @@ public class AuthUIView : MonoBehaviour
     private void Awake()
     {
         AutoBindIfNeeded();
-        ConfigurePasswordField(_loginPasswordInput);
-        ConfigurePasswordField(_registerPasswordInput);
-        ConfigurePasswordField(_confirmPasswordInput);
-        HideAllInputTips();
+        _formBindings = new AuthFormBindings(
+            _loginPanel,
+            _registerPanel,
+            _loginUserNameInput,
+            _loginPasswordInput,
+            _registerUserNameInput,
+            _registerPasswordInput,
+            _confirmPasswordInput,
+            _loginButton,
+            _goRegisterButton,
+            _registerButton,
+            _goLoginButton,
+            _loginAccountTip,
+            _loginPasswordTip,
+            _registerAccountTip,
+            _registerPasswordTip,
+            _confirmPasswordTip,
+            _statusText);
+        _formBindings.ConfigurePasswordFields();
+        _formBindings.HideAllInputTips();
         _usernamePanelView = UsernamePanelView.GetOrCreate(transform);
         _loadingOverlay = LoadingOverlayView.GetOrCreate(transform);
+        _loginFlowCoordinator = new AuthLoginFlowCoordinator(
+            _usernamePanelView,
+            _loadingOverlay,
+            SetSubmitting,
+            SetStatus);
     }
 
     private void OnEnable()
@@ -73,11 +95,7 @@ public class AuthUIView : MonoBehaviour
             _goLoginButton.onClick.AddListener(ShowLogin);
         }
 
-        BindInputSelect(_loginUserNameInput, HideLoginAccountTip);
-        BindInputSelect(_loginPasswordInput, HideLoginPasswordTip);
-        BindInputSelect(_registerUserNameInput, HideRegisterAccountTip);
-        BindInputSelect(_registerPasswordInput, HideRegisterPasswordTip);
-        BindInputSelect(_confirmPasswordInput, HideConfirmPasswordTip);
+        _formBindings.BindTipClearEvents();
     }
 
     private void OnDisable()
@@ -102,19 +120,16 @@ public class AuthUIView : MonoBehaviour
             _goLoginButton.onClick.RemoveListener(ShowLogin);
         }
 
-        UnbindInputSelect(_loginUserNameInput, HideLoginAccountTip);
-        UnbindInputSelect(_loginPasswordInput, HideLoginPasswordTip);
-        UnbindInputSelect(_registerUserNameInput, HideRegisterAccountTip);
-        UnbindInputSelect(_registerPasswordInput, HideRegisterPasswordTip);
-        UnbindInputSelect(_confirmPasswordInput, HideConfirmPasswordTip);
+        _formBindings.UnbindTipClearEvents();
     }
 
+    // Unity 生命周期函数只能使用 void；异步初始化逻辑在此边界内等待完成。
     private async void Start()
     {
         // UsernamePanel 只在认证成功且 Firestore 中没有昵称时才从 Resources 加载。
         _usernamePanelView.Hide();
         ShowLogin();
-        SetAuthButtonsInteractable(false);
+        _formBindings.SetInteractable(false);
 
         _loadingOverlay.Show();
         FirebaseInitializationResult initialization;
@@ -128,18 +143,18 @@ public class AuthUIView : MonoBehaviour
         }
 
         _isFirebaseReady = initialization.Success;
-        SetAuthButtonsInteractable(_isFirebaseReady);
+        _formBindings.SetInteractable(_isFirebaseReady);
 
         if (!_isFirebaseReady)
         {
-            SetStatus(initialization.Message);
+            _formBindings.SetStatus(initialization.Message);
         }
         else
         {
             string kickMessage = AuthKickNotice.Consume();
             if (!string.IsNullOrEmpty(kickMessage))
             {
-                ShowFieldTip(AuthField.Email, kickMessage, isLogin: true);
+                _formBindings.ShowResult(AuthResult.Fail(kickMessage, AuthField.Email), isLogin: true);
             }
         }
     }
@@ -147,65 +162,16 @@ public class AuthUIView : MonoBehaviour
     public void ShowLogin()
     {
         Debug.Log("[Login] Switch to LoginPanel");
-        ClearRegisterInputs();
-        HideRegisterInputTips();
-
-        if (_loginPanel != null)
-        {
-            _loginPanel.SetActive(true);
-        }
-
-        if (_registerPanel != null)
-        {
-            _registerPanel.SetActive(false);
-        }
-
-        SetStatus(string.Empty);
+        _formBindings.ShowLoginPanel();
     }
 
     public void ShowRegister()
     {
         Debug.Log("[Login] Switch to RegisterPanel");
-        ClearLoginInputs();
-        HideLoginInputTips();
-
-        if (_loginPanel != null)
-        {
-            _loginPanel.SetActive(false);
-        }
-
-        if (_registerPanel != null)
-        {
-            _registerPanel.SetActive(true);
-        }
-
-        SetStatus(string.Empty);
+        _formBindings.ShowRegisterPanel();
     }
 
-    private void ClearLoginInputs()
-    {
-        ClearInput(_loginUserNameInput);
-        ClearInput(_loginPasswordInput);
-    }
-
-    private void ClearRegisterInputs()
-    {
-        ClearInput(_registerUserNameInput);
-        ClearInput(_registerPasswordInput);
-        ClearInput(_confirmPasswordInput);
-    }
-
-    private static void ClearInput(TMP_InputField field)
-    {
-        if (field == null)
-        {
-            return;
-        }
-
-        field.text = string.Empty;
-        field.DeactivateInputField();
-    }
-
+    // Unity Button 回调必须使用 void；认证请求在回调内部异步执行。
     public async void OnLoginClicked()
     {
         if (!_isFirebaseReady || _isSubmitting)
@@ -213,18 +179,14 @@ public class AuthUIView : MonoBehaviour
             return;
         }
 
-        HideLoginInputTips();
+        _formBindings.HideLoginInputTips();
         SetSubmitting(true);
 
         _loadingOverlay.Show();
         AuthResult result;
         try
         {
-            result = await _authController.LoginAsync(new LoginRequest
-            {
-                Email = _loginUserNameInput != null ? _loginUserNameInput.text : string.Empty,
-                Password = _loginPasswordInput != null ? _loginPasswordInput.text : string.Empty
-            });
+            result = await _authController.LoginAsync(_formBindings.CreateLoginRequest());
         }
         finally
         {
@@ -235,40 +197,11 @@ public class AuthUIView : MonoBehaviour
         ShowLoginResult(result);
         if (result.Success)
         {
-            SetSubmitting(true);
-            Debug.Log("[Login] Auth success, start profile check before Play.");
-            _usernamePanelView.CheckCurrentPlayerNameAsync(
-                EnterPlayScene,
-                () => SetSubmitting(false));
+            _loginFlowCoordinator.ContinueAfterLogin();
         }
     }
 
-    private async void EnterPlayScene()
-    {
-        Debug.Log("[Login] EnterPlayScene begin.");
-        if (_loadingOverlay != null)
-        {
-            _loadingOverlay.Show();
-        }
-
-        try
-        {
-            await GameSceneController.LoadPlaySceneAsync();
-            Debug.Log("[Login] EnterPlayScene load requested.");
-        }
-        catch (System.Exception exception)
-        {
-            Debug.LogException(exception);
-            if (_loadingOverlay != null)
-            {
-                _loadingOverlay.Hide();
-            }
-
-            SetSubmitting(false);
-            SetStatus("Failed to enter the game scene.");
-        }
-    }
-
+    // Unity Button 回调必须使用 void；注册请求在回调内部异步执行。
     public async void OnRegisterClicked()
     {
         if (!_isFirebaseReady || _isSubmitting)
@@ -276,20 +209,15 @@ public class AuthUIView : MonoBehaviour
             return;
         }
 
-        HideRegisterInputTips();
+        _formBindings.HideRegisterInputTips();
         SetSubmitting(true);
 
-        string registeredEmail = _registerUserNameInput != null ? _registerUserNameInput.text.Trim() : string.Empty;
+        string registeredEmail = _formBindings.RegisterEmail;
         _loadingOverlay.Show();
         AuthResult result;
         try
         {
-            result = await _authController.RegisterAsync(new RegisterRequest
-            {
-                Email = registeredEmail,
-                Password = _registerPasswordInput != null ? _registerPasswordInput.text : string.Empty,
-                ConfirmPassword = _confirmPasswordInput != null ? _confirmPasswordInput.text : string.Empty
-            });
+            result = await _authController.RegisterAsync(_formBindings.CreateRegisterRequest());
         }
         finally
         {
@@ -301,189 +229,42 @@ public class AuthUIView : MonoBehaviour
         if (result.Success)
         {
             ShowLogin();
-            if (_loginUserNameInput != null)
-            {
-                _loginUserNameInput.text = registeredEmail;
-            }
-
-            SetStatus(result.Message);
+            _formBindings.SetLoginEmail(registeredEmail);
+            _formBindings.SetStatus(result.Message);
         }
     }
 
     private void ShowLoginResult(AuthResult result)
     {
-        if (result.Success)
+        _formBindings.ShowResult(result, isLogin: true);
+        if (result.Success && result.User != null)
         {
-            HideLoginInputTips();
-            SetStatus(result.Message);
-            if (result.User != null)
-            {
-                Debug.Log($"[Auth] Authenticated player: {result.User.Name} ({result.User.Uid})");
-            }
-
-            return;
+            Debug.Log($"[Auth] Authenticated player: {result.User.Name} ({result.User.Uid})");
         }
-
-        SetStatus(string.Empty);
-        ShowFieldTip(result.Field, result.Message, isLogin: true);
     }
 
     private void ShowRegisterResult(AuthResult result)
     {
-        if (result.Success)
+        _formBindings.ShowResult(result, isLogin: false);
+        if (result.Success && result.User != null)
         {
-            HideRegisterInputTips();
-            if (result.User != null)
-            {
-                Debug.Log($"[Auth] Authenticated player: {result.User.Name} ({result.User.Uid})");
-            }
-
-            return;
+            Debug.Log($"[Auth] Authenticated player: {result.User.Name} ({result.User.Uid})");
         }
-
-        SetStatus(string.Empty);
-        ShowFieldTip(result.Field, result.Message, isLogin: false);
-    }
-
-    private void ShowFieldTip(AuthField field, string message, bool isLogin)
-    {
-        switch (field)
-        {
-            case AuthField.Email:
-                SetInputTip(isLogin ? _loginAccountTip : _registerAccountTip, message);
-                break;
-            case AuthField.Password:
-                SetInputTip(isLogin ? _loginPasswordTip : _registerPasswordTip, message);
-                break;
-            case AuthField.ConfirmPassword:
-                SetInputTip(_confirmPasswordTip, message);
-                break;
-            default:
-                SetStatus(message);
-                break;
-        }
-    }
-
-    private static void SetInputTip(TMP_Text tip, string message)
-    {
-        if (tip == null)
-        {
-            return;
-        }
-
-        tip.text = message ?? string.Empty;
-        tip.gameObject.SetActive(!string.IsNullOrEmpty(message));
-    }
-
-    private static void HideInputTip(TMP_Text tip)
-    {
-        if (tip == null)
-        {
-            return;
-        }
-
-        tip.text = string.Empty;
-        tip.gameObject.SetActive(false);
-    }
-
-    private void HideAllInputTips()
-    {
-        HideLoginInputTips();
-        HideRegisterInputTips();
-    }
-
-    private void HideLoginInputTips()
-    {
-        HideInputTip(_loginAccountTip);
-        HideInputTip(_loginPasswordTip);
-    }
-
-    private void HideRegisterInputTips()
-    {
-        HideInputTip(_registerAccountTip);
-        HideInputTip(_registerPasswordTip);
-        HideInputTip(_confirmPasswordTip);
-    }
-
-    private void HideLoginAccountTip(string _)
-    {
-        HideInputTip(_loginAccountTip);
-    }
-
-    private void HideLoginPasswordTip(string _)
-    {
-        HideInputTip(_loginPasswordTip);
-    }
-
-    private void HideRegisterAccountTip(string _)
-    {
-        HideInputTip(_registerAccountTip);
-    }
-
-    private void HideRegisterPasswordTip(string _)
-    {
-        HideInputTip(_registerPasswordTip);
-    }
-
-    private void HideConfirmPasswordTip(string _)
-    {
-        HideInputTip(_confirmPasswordTip);
-    }
-
-    private static void BindInputSelect(TMP_InputField field, UnityEngine.Events.UnityAction<string> onSelect)
-    {
-        if (field == null)
-        {
-            return;
-        }
-
-        field.onSelect.AddListener(onSelect);
-    }
-
-    private static void UnbindInputSelect(TMP_InputField field, UnityEngine.Events.UnityAction<string> onSelect)
-    {
-        if (field == null)
-        {
-            return;
-        }
-
-        field.onSelect.RemoveListener(onSelect);
     }
 
     private void SetStatus(string message)
     {
-        if (_statusText == null)
-        {
-            return;
-        }
-
-        _statusText.gameObject.SetActive(!string.IsNullOrEmpty(message));
-        _statusText.text = message ?? string.Empty;
+        _formBindings.SetStatus(message);
     }
 
     // 认证请求期间锁定所有认证按钮，避免用户重复点击创建多个 Firebase 请求。
     private void SetSubmitting(bool submitting)
     {
         _isSubmitting = submitting;
-        SetAuthButtonsInteractable(_isFirebaseReady && !submitting);
+        _formBindings.SetInteractable(_isFirebaseReady && !submitting);
     }
 
-    private void SetAuthButtonsInteractable(bool interactable)
-    {
-        SetButtonInteractable(_loginButton, interactable);
-        SetButtonInteractable(_goRegisterButton, interactable);
-        SetButtonInteractable(_registerButton, interactable);
-        SetButtonInteractable(_goLoginButton, interactable);
-    }
-
-    private static void SetButtonInteractable(Button button, bool interactable)
-    {
-        if (button != null)
-        {
-            button.interactable = interactable;
-        }
-    }
-
+    // 当前 LoginMenu 依赖运行时路径绑定以兼容已有场景；本次只隔离该技术债，不重命名节点或修改序列化引用。
     private void AutoBindIfNeeded()
     {
         if (_loginPanel == null)
@@ -582,17 +363,6 @@ public class AuthUIView : MonoBehaviour
                 _statusText = status.GetComponent<TMP_Text>();
             }
         }
-    }
-
-    private static void ConfigurePasswordField(TMP_InputField field)
-    {
-        if (field == null)
-        {
-            return;
-        }
-
-        field.contentType = TMP_InputField.ContentType.Password;
-        field.ForceLabelUpdate();
     }
 
     private static TMP_InputField FindInput(Transform root, string relativePath)
