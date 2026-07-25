@@ -1,8 +1,8 @@
-# ARPG
+# UnityLoginDemo
 
-本仓库是一个使用 Unity 制作的 ARPG 原型，包含账号注册/登录、玩家昵称持久化、同账号单点登录（顶号），以及 Photon Fusion 联机玩家生成与昵称同步。
+本仓库是一个 Unity 登录与联机演示项目（UnityLoginDemo），用于简单体现账号体系、云端数据串联与 Photon Fusion 联机能力。当前覆盖：邮箱注册/登录、昵称持久化、同账号单点登录（顶号），以及 Fusion 联机玩家生成与昵称同步。
 
-> 本文以仓库代码、Unity 项目设置和 `D:\桌面\后端配置` 中于 2026-07-25 截取的后台画面为依据。截图已尽量遮蔽账号、UID 与应用 ID；若画面中仍残留项目编号、UID 片段等标识，请勿当作可用凭据使用，也不要将真实密钥或用户数据提交到仓库。
+> 本文以仓库代码、Unity 项目设置和 `Docs/images/backend-configuration/` 中于 2026-07-25 截取的后台画面为依据。文档与截图**保留** Firebase 项目 ID、示例 UID、Photon App ID 等真实配置标识，便于对照实现与后台一致性；请勿将本仓库中的密钥/服务账号私钥等凭据用于生产或二次分发。
 
 ## 快速结论
 
@@ -11,30 +11,16 @@
 | Unity 版本 | **Unity 2022.3.62f2**。`ProjectSettings/ProjectVersion.txt` 当前记录为 `2022.3.62f2c1`。 |
 | 身份认证 | Firebase Authentication，当前代码使用邮箱/密码。 |
 | 数据库 | Cloud Firestore（NoSQL 文档数据库），不是 MySQL/PostgreSQL/MongoDB，也没有本地 SQL schema。 |
-| 联机 | Photon Fusion，连接 Photon Cloud；后台截图显示应用使用 Lobbies V2、20 CCU。 |
+| 联机 | Photon Fusion，连接 Photon Cloud；应用名 `MultiplayerTest`，Lobbies V2、20 CCU，`FixedRegion: hk`。 |
 | 前端与后端通信 | Unity 通过 Firebase Unity SDK 直连 Authentication/Firestore；通过 Fusion SDK 连 Photon Cloud。没有 RESTful API、GraphQL、自建 WebSocket 服务或自建 Node.js/Python 后端。 |
 | 本地运行 | 只需 Unity 与互联网连接。Firebase/Photon 均为云端托管服务，因此没有 Docker Compose、数据库容器或后端进程需要启动。 |
+| 当前环境标识 | Firebase 项目 `UnityTest`（`unitytest-8f8bd` / `413352915978`），Android 包名 `com.MyCompany.LoginDemo`；Photon AppIdFusion `d0a9f4b7-b699-4fc1-838a-6c1cacb362ed`。示例 Firestore 文档 UID：`8mP7vbUBTEelbBCvHFK2mas3auh2`。 |
 
 ## 系统架构
 
 ![系统架构](Docs/images/backend-configuration/system-architecture.drawio.png)
 
 可在 draw.io/diagrams.net 中编辑源文件：[system-architecture.drawio](Docs/images/backend-configuration/system-architecture.drawio)。
-
-```mermaid
-flowchart LR
-    U[Unity 客户端\nUnity 2022.3.62f2]
-    A[Firebase Authentication\n邮箱/密码认证]
-    F[(Cloud Firestore\nUsers/{uid})]
-    R[Firestore 安全规则\nrequest.auth.uid == uid]
-    P[Photon Cloud\nFusion / Lobbies V2]
-    O[其他在线玩家\nFusion Shared Mode]
-    U -->|Firebase Unity SDK| A
-    U -->|Firestore：档案、Listen 顶号、心跳兜底| F
-    R -->|授权| F
-    U -->|Fusion SDK| P
-    P -->|房间与状态同步| O
-```
 
 1. Unity 登录界面将邮箱与密码交给 `FirebaseAuthManager`，由 Firebase Authentication 完成注册或登录。
 2. 登录成功后，`AuthController` 生成新的会话 ID，并通过 `ForceAcquireAsync` 覆盖 Firestore `Users/{uid}` 的在线会话。
@@ -48,7 +34,7 @@ flowchart LR
 Assets/FireBase+Photon/
 ├─ Scenes/
 │  ├─ LoginMenu.unity             # 启动场景
-│  └─ Play.unity                  # 游戏场景
+│  └─ Play.unity                  # 联机演示场景
 └─ Scripts/
    ├─ Auth/
    │  ├─ Domain/                  # 认证/会话相关模型
@@ -126,7 +112,7 @@ service cloud.firestore {
 
 当前联机实现使用 Fusion。`Assets/Photon/PhotonUnityNetworking/Resources/PhotonServerSettings.asset` 是 PUN 的独立设置资源；不要用它替代 Fusion 的 `PhotonAppSettings.asset`。Fusion 设置当前使用 Photon Name Server、固定香港区域（`hk`），没有填写自建服务器地址。
 
-Firebase Console 的截图显示 **Google** 登录提供方已启用，但当前仓库的 `FirebaseAuthManager` 只调用 `CreateUserWithEmailAndPasswordAsync` 与 `SignInWithEmailAndPasswordAsync`。因此，Google 登录尚未由 Unity UI/代码接入；仅在 Console 启用不代表游戏内已经可用。
+Firebase Console 的截图显示 **Google** 登录提供方已启用，但当前仓库的 `FirebaseAuthManager` 只调用 `CreateUserWithEmailAndPasswordAsync` 与 `SignInWithEmailAndPasswordAsync`。因此，Google 登录尚未由 Unity UI/代码接入；仅在 Console 启用不代表客户端内已经可用。
 
 ## 首次配置
 
@@ -135,7 +121,7 @@ Firebase Console 的截图显示 **Google** 登录提供方已启用，但当前
 1. 在 Unity Hub 安装 **Unity 2022.3.62f2**，并包含目标平台的 Build Support。
 2. 使用 Unity Hub 的 **Add/Open** 打开本仓库根目录。
 3. 等待 Unity 导入资源和生成项目文件；不要用其它主版本打开后再提交 `ProjectSettings/ProjectVersion.txt`。
-4. 如 Package Manager 报 `com.unitymcp.server` 找不到，检查 `Packages/manifest.json` 中的本地绝对路径是否在当前机器存在。该包是开发辅助工具，不是游戏运行时后端。
+4. 如 Package Manager 报 `com.unitymcp.server` 找不到，检查 `Packages/manifest.json` 中的本地绝对路径是否在当前机器存在。该包是开发辅助工具，不是本项目的运行时后端。
 
 ### 2. 配置 Firebase
 
@@ -144,14 +130,14 @@ Firebase Console 的截图显示 **Google** 登录提供方已启用，但当前
 3. 下载新的 `google-services.json`，替换 `Assets/google-services.json`；桌面目标也同步替换 `Assets/StreamingAssets/google-services-desktop.json`。
 4. 在 **Authentication -> 登录方法** 启用 **电子邮件地址/密码**。这是当前代码唯一实际调用的认证方式。
 5. 在 **Firestore Database** 创建默认数据库，并在 **规则** 页发布上一节的规则。
-6. 首次登录后，游戏会按需创建/更新 `Users/{Firebase UID}`。不需要预先手工创建用户文档。
+6. 首次登录后，客户端会按需创建/更新 `Users/{Firebase UID}`。不需要预先手工创建用户文档。
 
 若未来接入 Google 登录，除启用提供方外，还需在 Unity 侧实现 Google 凭据取得与 `FirebaseAuth.SignInWithCredentialAsync` 调用，并为 Android 发布签名配置 SHA 指纹；这不属于当前代码已完成的功能。
 
 ### 3. 配置 Photon Fusion
 
 1. 登录 Photon Dashboard，创建 **Fusion** 应用。
-2. 在 Dashboard 中确认该应用可用的 CCU 与 Lobbies；本项目提供的截图是 Lobbies V2、20 CCU 的配置示例，不应把截图中的应用 ID 复制到新环境。
+2. 在 Dashboard 中确认该应用可用的 CCU 与 Lobbies；本项目当前使用的 Photon 应用为 `MultiplayerTest`，App ID 与 `PhotonAppSettings.asset` 中的 `AppIdFusion` 一致（见上方环境标识）。
 3. 在 Unity 中打开 `Assets/Photon/Fusion/Resources/PhotonAppSettings.asset`，将 Dashboard 的 Fusion **App ID** 填入 `AppIdFusion`。
 4. 保持 `UseNameServer` 启用；如需固定区域，设置 `FixedRegion`（现有项目使用 `hk`）。将其清空可让 Photon 选择最佳区域。
 5. 不填写 `Server` 或 `Port`，除非你明确切换到自建 Photon Server；当前项目设计连接 Photon Cloud。
@@ -177,18 +163,18 @@ Firebase Console 的截图显示 **Google** 登录提供方已启用，但当前
 
 ## 后台配置截图
 
-以下截图均来自 `D:\桌面\后端配置`，已尽量去识别化。它们是当前配置的佐证，不能代替新 Firebase/Photon 项目的实际配置。若仍可见项目编号或 UID 片段，请视为已脱敏不完全的残留信息，勿用于生产或公开传播。
+以下截图均存放于仓库内的 `Docs/images/backend-configuration/`，**保留真实项目 ID、UID、Photon App ID 等标识**，便于对照 Console/Dashboard 与仓库配置的一致性。它们记录的是本项目当前环境，不是通用模板。
 
 | 截图 | 说明 |
 | --- | --- |
-| ![Firebase 项目设置](Docs/images/backend-configuration/firebase-project-settings.png) | Firebase 项目常规设置。 |
-| ![Firebase Android 应用](Docs/images/backend-configuration/firebase-android-app.png) | Android 应用与 `google-services.json` 下载入口。 |
-| ![Firebase Authentication 用户](Docs/images/backend-configuration/firebase-auth-users.png) | Authentication 用户管理页，用户资料已遮蔽。 |
+| ![Firebase 项目设置](Docs/images/backend-configuration/firebase-project-settings.png) | Firebase 项目 `UnityTest` 常规设置（项目 ID / 编号可见）。 |
+| ![Firebase Android 应用](Docs/images/backend-configuration/firebase-android-app.png) | Android 应用 `com.MyCompany.LoginDemo` 与 `google-services.json` 下载入口。 |
+| ![Firebase Authentication 用户](Docs/images/backend-configuration/firebase-auth-users.png) | Authentication 用户列表（邮箱与 UID 可见）。 |
 | ![Firebase 登录提供方](Docs/images/backend-configuration/firebase-sign-in-providers.png) | 邮箱/密码与 Google 提供方在 Console 中已启用。 |
-| ![Firestore Users 文档](Docs/images/backend-configuration/firestore-users-document.png) | `Users` 集合与会话字段示例，文档 UID 已遮蔽。 |
+| ![Firestore Users 文档](Docs/images/backend-configuration/firestore-users-document.png) | `Users/8mP7vbUBTEelbBCvHFK2mas3auh2` 与会话字段示例。 |
 | ![Firestore 规则](Docs/images/backend-configuration/firestore-security-rules.png) | `Users/{uid}` 的归属访问规则。 |
-| ![Photon Dashboard 应用概览](Docs/images/backend-configuration/photon-dashboard-overview.png) | Photon 应用、Lobbies V2 与 CCU 配额，应用 ID 已遮蔽。 |
-| ![Photon Dashboard 应用详情](Docs/images/backend-configuration/photon-dashboard-details.png) | Photon 应用详情，应用 ID 已遮蔽。 |
+| ![Photon Dashboard 应用概览](Docs/images/backend-configuration/photon-dashboard-overview.png) | `MultiplayerTest`：App ID、Lobbies V2 与 20 CCU。 |
+| ![Photon Dashboard 应用详情](Docs/images/backend-configuration/photon-dashboard-details.png) | Photon 应用详情（含 App ID）。 |
 
 ## AI 使用说明
 
