@@ -10,5 +10,7 @@
 | 建立或补齐 EditMode 测试 | 不采用 | 按用户要求，避免测试程序集改造，使用 Unity MCP 静态编译检测 |
 | 提取表单请求构造 | 已完成 | `AuthFormRequestFactory` 集中 TMP 输入读取与请求对象创建；Unity 项目编译无错误 |
 | 提取 UI 绑定与登录续流程 | 已完成 | `AuthFormBindings` 集中表单展示与交互；`AuthLoginFlowCoordinator` 集中昵称检查后的场景续流程；保留原有运行时绑定与业务顺序 |
+| 脚本目录层级重构 | 已完成 | `GameFlow` 聚合场景流；`Player` 按 Network、Movement、Camera、Animation、Profile 划分；Unity 资产移动保留 GUID |
+| Auth 分层目录重构 | 已完成 | Auth 按 Domain、Application、View、Infrastructure、Networking 归档；Firebase、Firestore、Fusion 与 UI 边界清晰 |
 | 清理重复会话状态与补充注释 | 已完成 | `UserSession` 保持唯一内存态；关键异步与网络边界补充中文说明 |
 | Unity MCP 编译与场景回归校验 | 已完成 | 纯校验器编译通过；`LoginMenu` 无缺失脚本；6 项 TMP 重名警告未改动 |
