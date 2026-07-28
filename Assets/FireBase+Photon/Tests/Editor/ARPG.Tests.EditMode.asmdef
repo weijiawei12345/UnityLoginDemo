@@ -2,10 +2,16 @@
   "name": "ARPG.Tests.EditMode",
   "rootNamespace": "ARPG.Tests",
   "references": [
-    "ARPG.Networking.Lobby.Core"
+    "ARPG.Networking.Lobby.Core",
+    "ARPG.Player.Movement.Core",
+    "Fusion.Unity"
   ],
   "includePlatforms": [
     "Editor"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Fusion.Runtime.dll"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

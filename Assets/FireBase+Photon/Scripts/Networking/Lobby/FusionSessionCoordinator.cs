@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using ARPG.Player.Input;
 using ARPG.Auth;
 using ARPG.GameFlow;
 using Fusion;
@@ -281,6 +282,8 @@ namespace ARPG.Networking.Lobby
 
             _runner = runnerObject.AddComponent<NetworkRunner>();
             _runner.ProvideInput = true;
+            runnerObject.AddComponent<LegacyPlayerInputSource>();
+            runnerObject.AddComponent<FusionPlayerInputCallbacks>();
             _sceneManager = runnerObject.AddComponent<NetworkSceneManagerDefault>();
             _lobbyService = runnerObject.AddComponent<FusionLobbyService>();
             runnerObject.AddComponent<FusionAuthSessionBridge>();

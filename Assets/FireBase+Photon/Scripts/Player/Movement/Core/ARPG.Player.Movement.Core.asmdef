@@ -1,0 +1,6 @@
+{
+  "name": "ARPG.Player.Movement.Core",
+  "rootNamespace": "ARPG.Player.Movement.Core",
+  "references": [],
+  "autoReferenced": true
+}

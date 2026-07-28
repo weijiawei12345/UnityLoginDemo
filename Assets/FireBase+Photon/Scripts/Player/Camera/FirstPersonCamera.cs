@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class FirstPersonCamera : MonoBehaviour
 {
-    public Transform Target;
+    [SerializeField] private Transform target;
     public float MouseSensitivity = 12f;
 
     private float verticalRotation;
@@ -10,10 +10,10 @@ public class FirstPersonCamera : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (Target == null) return;
+        if (target == null) return;
 
         // Match target position exactly
-        transform.position = Target.position;
+        transform.position = target.position;
 
         float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
@@ -23,5 +23,20 @@ public class FirstPersonCamera : MonoBehaviour
         horizontalRotation += mouseX * MouseSensitivity;
 
         transform.rotation = Quaternion.Euler(verticalRotation, horizontalRotation, 0f);
+    }
+
+    /// <summary>Starts following the supplied local player.</summary>
+    public void Bind(Transform newTarget)
+    {
+        target = newTarget;
+    }
+
+    /// <summary>Stops following the supplied player if it is still the active target.</summary>
+    public void Unbind(Transform oldTarget)
+    {
+        if (target == oldTarget)
+        {
+            target = null;
+        }
     }
 }
