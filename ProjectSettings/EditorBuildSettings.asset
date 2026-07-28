@@ -9,6 +9,9 @@ EditorBuildSettings:
     path: Assets/FireBase+Photon/Scenes/LoginMenu.unity
     guid: 3b20b52b8450fa14e9bf10b6e3396aa6
   - enabled: 1
+    path: Assets/FireBase+Photon/Scenes/FusionLobby.unity
+    guid: 2f1421e7b2a58bc438ad824915516add
+  - enabled: 1
     path: Assets/FireBase+Photon/Scenes/Play.unity
     guid: 0b742fba6b0e20b44b9fb488ce43cc10
   - enabled: 0

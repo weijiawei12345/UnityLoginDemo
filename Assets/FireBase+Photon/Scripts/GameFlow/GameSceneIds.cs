@@ -6,6 +6,7 @@ namespace ARPG.GameFlow
     public static class GameSceneIds
     {
         public const string LoginMenu = "LoginMenu";
+        public const string Lobby = "FusionLobby";
         public const string Play = "Play";
     }
 }

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Authority Flow">
+    <mxGraphModel dx="1000" dy="640" grid="1" gridSize="10" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="Input Authority&#xa;采样 WASD / 空格 / 视角&#xa;生成 PlayerInput" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="60" y="250" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="Fusion Input Adapter&#xa;OnInput + INetworkInput&#xa;仅传输入意图" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="350" y="250" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="Authority Policy&#xa;Shared / Host / Server&#xa;决定谁可模拟和写状态" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="640" y="250" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="State Authority&#xa;GetInput + MovementRules&#xa;验证并计算真实结果" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="930" y="250" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="网络状态&#xa;位置 / 速度 / 动画 / 名称&#xa;[Networked] + NetworkTransform" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="250" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="Presentation&#xa;远端插值、动画、音效&#xa;本地镜头与 UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="450" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="Shared: 玩家通常兼具输入和自身角色状态权威&#xa;Host/Server: 玩家只输入，Host/Server 计算并发布结果" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="465" y="80" width="590" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="输入意图" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="2" target="3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="按 tick 提交" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="3" target="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="策略授权" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="4" target="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="权威快照" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="5" target="6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="13" value="读取" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="6" target="7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

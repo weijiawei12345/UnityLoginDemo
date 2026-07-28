@@ -7,7 +7,7 @@ namespace ARPG.Auth
 {
     /// <summary>
     /// 认证成功后的续流程协调器。
-    /// 只负责“昵称档案就绪后进入 Play”，不处理表单输入、Firebase 登录或场景内网络对象。
+    /// 只负责“昵称档案就绪后进入 Lobby”，不处理表单输入、Firebase 登录或场景内网络对象。
     /// </summary>
     internal sealed class AuthLoginFlowCoordinator
     {
@@ -32,7 +32,7 @@ namespace ARPG.Auth
         {
             _setSubmitting(true);
             Debug.Log("[Login] Auth success, start profile check before Play.");
-            _usernamePanelView.CheckCurrentPlayerNameAsync(EnterPlaySceneAsync, OnProfileFlowAborted);
+            _usernamePanelView.CheckCurrentPlayerNameAsync(EnterLobbySceneAsync, OnProfileFlowAborted);
         }
 
         private void OnProfileFlowAborted()
@@ -41,14 +41,14 @@ namespace ARPG.Auth
         }
 
         // UsernamePanelView 当前以 Action 回调通知昵称就绪；适配层只能使用 void，实际逻辑仍保留为 Task。
-        private async void EnterPlaySceneAsync()
+        private async void EnterLobbySceneAsync()
         {
-            await EnterPlaySceneInternalAsync();
+            await EnterLobbySceneInternalAsync();
         }
 
-        private async Task EnterPlaySceneInternalAsync()
+        private async Task EnterLobbySceneInternalAsync()
         {
-            Debug.Log("[Login] EnterPlayScene begin.");
+            Debug.Log("[Login] EnterLobbyScene begin.");
             if (_loadingOverlay != null)
             {
                 _loadingOverlay.Show();
@@ -56,8 +56,8 @@ namespace ARPG.Auth
 
             try
             {
-                await GameSceneController.LoadPlaySceneAsync();
-                Debug.Log("[Login] EnterPlayScene load requested.");
+                await GameSceneController.LoadLobbySceneAsync();
+                Debug.Log("[Login] Lobby scene load requested.");
             }
             catch (Exception exception)
             {
@@ -68,7 +68,7 @@ namespace ARPG.Auth
                 }
 
                 _setSubmitting(false);
-                _setStatus("Failed to enter the game scene.");
+                _setStatus("Failed to enter the lobby.");
             }
         }
     }

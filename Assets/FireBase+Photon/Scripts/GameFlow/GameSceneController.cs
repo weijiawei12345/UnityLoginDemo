@@ -19,9 +19,19 @@ namespace ARPG.GameFlow
             LoadScene(GameSceneIds.LoginMenu);
         }
 
+        public static void LoadLobbyScene()
+        {
+            LoadScene(GameSceneIds.Lobby);
+        }
+
         public static async Task LoadPlaySceneAsync()
         {
             await LoadSceneAsync(GameSceneIds.Play);
+        }
+
+        public static async Task LoadLobbySceneAsync()
+        {
+            await LoadSceneAsync(GameSceneIds.Lobby);
         }
 
         private static void LoadScene(string sceneName)

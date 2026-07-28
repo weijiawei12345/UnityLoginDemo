@@ -5,7 +5,7 @@ using UnityEngine;
 
 /// <summary>
 /// View + 网络状态：同步玩家展示名并刷新世界空间 TMP（参考教程 NetworkPlayer）。
-/// Shared Mode 下由 State Authority 写入。
+/// Input Authority requests changes; State Authority validates and writes network state.
 /// </summary>
 public sealed class NetworkPlayer : NetworkBehaviour
 {
@@ -15,15 +15,15 @@ public sealed class NetworkPlayer : NetworkBehaviour
     [Networked, OnChangedRender(nameof(ApplyName))]
     public NetworkString<_32> PlayerName { get; set; }
 
-    /// <summary>本机拥有 State Authority 的玩家实例。</summary>
+    /// <summary>The player instance controlled by this client's Input Authority.</summary>
     public static NetworkPlayer Local { get; private set; }
 
     public override void Spawned()
     {
-        if (HasStateAuthority)
+        if (HasInputAuthority)
         {
             Local = this;
-            PlayerName = PlayerDisplayNameData.GetLocalDisplayName();
+            RPC_RequestDisplayName(PlayerDisplayNameData.GetLocalDisplayName());
         }
 
         ApplyName();
@@ -38,18 +38,49 @@ public sealed class NetworkPlayer : NetworkBehaviour
     }
 
     /// <summary>
-    /// 仅 State Authority 可改网络昵称（游戏内改名成功后由 Controller 调用）。
+    /// The local Input Authority may request a display-name change.
     /// </summary>
     public bool TrySetDisplayName(string displayName)
     {
-        if (!HasStateAuthority)
+        if (!HasInputAuthority)
         {
             return false;
         }
 
-        PlayerName = PlayerDisplayNameData.Truncate(displayName);
-        ApplyName();
+        RPC_RequestDisplayName(displayName);
         return true;
+    }
+
+    [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
+    private void RPC_RequestDisplayName(string displayName, RpcInfo info = default)
+    {
+        if (!HasStateAuthority || info.Source != Object.InputAuthority)
+        {
+            return;
+        }
+
+        PlayerName = NormalizeDisplayName(displayName);
+        ApplyName();
+    }
+
+    private static string NormalizeDisplayName(string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            return PlayerDisplayNameData.FallbackName;
+        }
+
+        string trimmed = displayName.Trim();
+        var sanitized = new System.Text.StringBuilder(trimmed.Length);
+        for (int i = 0; i < trimmed.Length; i++)
+        {
+            if (!char.IsControl(trimmed[i]))
+            {
+                sanitized.Append(trimmed[i]);
+            }
+        }
+
+        return PlayerDisplayNameData.Truncate(sanitized.ToString());
     }
 
     private void ApplyName()

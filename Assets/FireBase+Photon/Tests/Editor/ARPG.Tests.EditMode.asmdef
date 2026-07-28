@@ -1,0 +1,13 @@
+{
+  "name": "ARPG.Tests.EditMode",
+  "rootNamespace": "ARPG.Tests",
+  "references": [
+    "ARPG.Networking.Lobby.Core"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
