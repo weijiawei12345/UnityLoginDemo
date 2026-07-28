@@ -18,8 +18,8 @@ MonoBehaviour:
     AppIdVoice: b98d5337-8a59-45ba-a13f-67838495286c
     AppVersion: 
     UseNameServer: 1
-    FixedRegion: hk
-    Server: 
+    FixedRegion: cn
+    Server: ns.photonengine.cn
     Port: 0
     ProxyServer: 
     Protocol: 0
