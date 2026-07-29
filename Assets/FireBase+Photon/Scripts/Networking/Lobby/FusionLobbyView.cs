@@ -247,8 +247,14 @@ namespace ARPG.Networking.Lobby
                 AddLayoutHeight(row.gameObject, 64f);
                 row.interactable = room.CanJoin;
                 string selectedName = room.Name;
-                row.onClick.AddListener(() => _roomNameInput.text = selectedName);
+                row.onClick.AddListener(() => JoinRoomFromList(selectedName));
             }
+        }
+
+        private async void JoinRoomFromList(string roomName)
+        {
+            _roomNameInput.text = roomName;
+            await _coordinator.JoinRoomAsync(roomName);
         }
 
         private static RectTransform CreateRect(

@@ -16,6 +16,112 @@
 | 本地运行 | 只需 Unity 与互联网连接。Firebase/Photon 均为云端托管服务，因此没有 Docker Compose、数据库容器或后端进程需要启动。 |
 | 当前环境标识 | Firebase 项目 `UnityTest`（`unitytest-8f8bd` / `413352915978`），Android 包名 `com.MyCompany.LoginDemo`；Photon AppIdFusion `d0a9f4b7-b699-4fc1-838a-6c1cacb362ed`。示例 Firestore 文档 UID：`8mP7vbUBTEelbBCvHFK2mas3auh2`。 |
 
+## 快速开始
+
+目标：用最少步骤熟悉「从哪打开、改哪写逻辑、配哪连云端」。完整 Firebase / 中国光子云开通步骤见下方 [首次配置](#首次配置)。
+
+### 1. 打开工程
+
+1. 安装 **Unity 2022.3.62f2**（`ProjectSettings/ProjectVersion.txt` 当前为 `2022.3.62f2c1`）。
+2. 用 Unity Hub **打开仓库根目录**（含 `Assets/`、`Packages/`、`ProjectSettings/` 的这一层）。
+3. 等资源导入完成；若 Package Manager 报 `com.unitymcp.server` 找不到，检查 `Packages/manifest.json` 里的本地路径是否在本机存在（开发辅助包，不影响登录与联机运行）。
+
+### 2. 先认这三个场景
+
+构建入口已在 `ProjectSettings/EditorBuildSettings.asset` 启用，顺序为：
+
+| 顺序 | 场景 | 路径 |
+| --- | --- | --- |
+| 1 | `LoginMenu` | `Assets/FireBase+Photon/Scenes/LoginMenu.unity` |
+| 2 | `FusionLobby` | `Assets/FireBase+Photon/Scenes/FusionLobby.unity` |
+| 3 | `Play` | `Assets/FireBase+Photon/Scenes/Play.unity` |
+
+日常调试：打开 `LoginMenu.unity` → 点 Play。流程是 **登录/昵称 → 大厅建房或入房 → 网络化进入 Play**。
+
+### 3. 核心业务目录（日常改代码看这里）
+
+业务代码集中在 `Assets/FireBase+Photon/`。
+
+```text
+Assets/FireBase+Photon/
+├─ Scenes/          # LoginMenu / FusionLobby / Play
+├─ Scripts/
+│  ├─ Auth/         # 邮箱登录、Firestore 档案与单点会话
+│  ├─ Networking/   # FusionSessionCoordinator、大厅/房间 UI 与规则
+│  ├─ Player/       # 网络玩家生成、移动、输入、相机
+│  ├─ GameFlow/     # 场景 ID 与切换
+│  └─ UI/           # 通用 UI 辅助（如 TextFx）
+├─ Prefab/          # 玩家等预制体
+├─ Resources/       # 运行时 Resources 加载资源
+└─ Tests/Editor/    # EditMode 单元测试
+```
+
+快速对照「想改什么 → 去哪找」：
+
+| 你想改… | 优先打开 |
+| --- | --- |
+| 登录 / 注册 / 昵称 UI 与流程 | `Scripts/Auth/`（`View/`、`Application/Flow/`） |
+| Firebase / Firestore 读写 | `Scripts/Auth/Infrastructure/Firebase/`、`.../Firestore/` |
+| 大厅列表、建房、入房、离房 | `Scripts/Networking/Lobby/`（入口：`FusionSessionCoordinator.cs`） |
+| Play 内玩家生成与昵称同步 | `Scripts/Player/Network/` |
+| 场景切换常量 | `Scripts/GameFlow/` |
+
+更细的树状说明见下方 [项目结构](#项目结构)；关键类路径见文末 [关键源码索引](#关键源码索引)。
+
+### 4. 核心配置路径（连云端前先核对）
+
+| 用途 | 路径 | 你要确认的事 |
+| --- | --- | --- |
+| Firebase（Android / 通用） | `Assets/google-services.json` | 与 Firebase Console、Unity Android 包名一致 |
+| Firebase（桌面） | `Assets/StreamingAssets/google-services-desktop.json` | Editor / Standalone 登录可用 |
+| Fusion AppId 与中国区 | `Assets/Photon/Fusion/Resources/PhotonAppSettings.asset` | `AppIdFusion`；`FixedRegion: cn`；`Server: ns.photonengine.cn`；`UseNameServer` 启用 |
+| 构建场景顺序 | `ProjectSettings/EditorBuildSettings.asset` | 仅启用上述三个业务场景（`SampleScene` 应为关闭） |
+| Unity 版本锁 | `ProjectSettings/ProjectVersion.txt` | 保持 `2022.3.62f2c1`，勿用其它主版本打开后提交 |
+| Firestore 规则参考 | README「Firestore 安全规则」及 `Docs/images/backend-configuration/` | Console 规则与文档一致 |
+
+注意：`Assets/Photon/PhotonUnityNetworking/Resources/PhotonServerSettings.asset` 是 **PUN** 配置，不要用它替代 Fusion 的 `PhotonAppSettings.asset`。
+
+### 5. 房间页面操作（先会用再联机）
+
+大厅与已入房是两个页面，操作边界以 [`Docs/FusionLobbyRoomTechnicalPlan.md`](Docs/FusionLobbyRoomTechnicalPlan.md) 为准；UI 只调 `FusionSessionCoordinator`，不直接启停 Runner。完整契约见 [房间页面操作（UI 契约）](#房间页面操作ui-契约)。
+
+**`FusionLobby`（登录后大厅）** — `FusionLobbyView`
+
+| 操作 | 怎么用 | 调用 |
+| --- | --- | --- |
+| 自动入大厅 | 进入场景后自动连接 `arpg-v1` 并刷新列表 | `JoinLobbyAsync` |
+| 创建房间 | 填写房间名 → **Create room** | `CreateRoomAsync` |
+| 按名加入 | 填写房间名 → **Join by name**（房间不存在则失败，不隐式建房） | `JoinRoomAsync` |
+| 从列表加入 | 点击 **OPEN** 房间行（会填入房间名并加入） | `JoinRoomAsync` |
+| 快速匹配 | **Quick match**（按 `map/phase/build` 筛选） | `QuickMatchAsync` |
+| 刷新列表 | **Refresh**（已在大厅则重发列表；异常态则重连大厅） | `RefreshRooms` / `JoinLobbyAsync` |
+
+仅在状态为 `Lobby` 时可建房/入房/匹配；异步进行中按钮会禁用，防重复提交。
+
+**`Play`（已入房玩法场景）** — `FusionRoomLeaveView`
+
+| 操作 | 怎么用 | 调用 |
+| --- | --- | --- |
+| 离开房间 | **Leave room** → 回 `FusionLobby` 并重新入大厅 | `LeaveToLobbyAsync` |
+
+首期**不做**的房间 UI：关房/改 `phase`、踢人、准备/开始战斗、房主专属面板（技术文档中的 MasterClient 元数据管理属后续项）。
+
+### 6. 最小联机自测（配置已就绪时）
+
+1. 打开 `LoginMenu` → Play → 邮箱注册/登录 → 设昵称 → 进入 `FusionLobby`。
+2. 一端 **Create room**；另一端（ParrelSync 或 Build）用 **Join by name** 或点击列表 **OPEN** 行加入 → 双方进入 `Play` 并看到昵称。
+3. Play 内 **Leave room** 应回到大厅；同账号第二端登录应顶掉第一端回登录页。
+
+若登录或联机失败，按顺序查：`google-services*.json` → `PhotonAppSettings`（`cn` + 中国区 Name Server）→ 网络与 Console/Dashboard 配额。逐步验收清单见 [首次配置 → 运行与验证](#4-运行与验证)。
+
+### 7. 还需要深入时读什么
+
+| 需求 | 文档 |
+| --- | --- |
+| 大厅/房间状态机与 Runner 约定 | [`Docs/FusionLobbyRoomTechnicalPlan.md`](Docs/FusionLobbyRoomTechnicalPlan.md) |
+| Auth 与 Fusion 职责边界 | [`Docs/AuthNetworkTechnicalPlan.md`](Docs/AuthNetworkTechnicalPlan.md) |
+| 后台截图对照 | [`Docs/images/backend-configuration/`](Docs/images/backend-configuration/) |
+
 ## 系统架构
 
 ![系统架构](Docs/images/backend-configuration/system-architecture.drawio.png)
@@ -124,6 +230,40 @@ service cloud.firestore {
 ```
 
 `FusionSessionState` 覆盖 `Idle`、`ConnectingLobby`、`Lobby`、`JoiningRoom`、`InRoom`、`Leaving`、`Error`。异步操作通过 `_operationInProgress` 防重复提交。
+
+### 房间页面操作（UI 契约）
+
+依据技术方案实施项：「入大厅、会话列表、创建、指定加入、快速匹配、退出和失败提示」。UI（`FusionLobbyView` / `FusionRoomLeaveView`）**不得**自行 `StartGame` / `Shutdown` Runner，只能调用 `FusionSessionCoordinator`。
+
+#### A. `FusionLobby` — 大厅 / 房间列表页（`FusionLobbyView`）
+
+| 操作 | 界面入口 | Coordinator API | 成功结果 | 失败/约束 |
+| --- | --- | --- | --- | --- |
+| 进入大厅 | 场景加载后自动 | `JoinLobbyAsync` | 状态 `Lobby`；列表由 `OnSessionListUpdated` 驱动 | 认证租约失败 → Error；不可重复并发 |
+| 浏览房间列表 | 右侧 `AVAILABLE ROOMS`（只读快照） | 经 `FusionLobbyService` 推送 | 展示名、人数、`difficulty`、`OPEN`/`UNAVAILABLE` | `CanJoin` = 可见且开放且未满员 |
+| 创建房间 | 房间名输入 + **Create room** | `CreateRoomAsync(name)` | `StartGame(Shared)` + 网络化加载 `Play` | 仅 `Lobby`；房间名须通过 `FusionRoomRules`；`EnableClientSessionCreation=true` |
+| 按名加入 | 房间名输入 + **Join by name** | `JoinRoomAsync(name)` | 同上进入 `Play` | 房间不存在/满员/关闭 → 失败提示，**不隐式建房**（`EnableClientSessionCreation=false`） |
+| 从列表加入 | 点击 `OPEN` 房间行 | 填入房间名后 `JoinRoomAsync(name)` | 同上 | 仅 `CanJoin` 行可点；`UNAVAILABLE` 禁用 |
+| 快速匹配 | **Quick match** | `QuickMatchAsync()` | 匹配或新建可加入会话并进 `Play` | `SessionName=null`；筛选 `map=play`、`phase=waiting`、`build=Application.version` |
+| 刷新列表 | **Refresh** | `Lobby` 时 `RefreshRooms()`；否则 `JoinLobbyAsync()` | 重发当前快照或重连大厅 | `Error` 态仍可点 Refresh 尝试恢复 |
+
+交互规则：
+
+- 建房 / 按名加入 / 快速匹配 仅在 `State == Lobby` 时可点；进行中由 `_operationInProgress` 拦截重复提交。
+- 状态文案显示在标题栏右侧 Status；失败时进入 `Error` 并保留可理解提示。
+- 列表回调只更新内存快照与 UI，**不**在回调里创建网络对象。
+
+#### B. `Play` — 已入房玩法页（`FusionRoomLeaveView`）
+
+| 操作 | 界面入口 | Coordinator API | 成功结果 | 失败/约束 |
+| --- | --- | --- | --- | --- |
+| 离开房间 | **Leave room** | `LeaveToLobbyAsync` | 释放租约 → `Shutdown` Runner → 新租约 → 加载 `FusionLobby` → 再 `JoinLobbyAsync` | 新租约失败 → 登出并回 `LoginMenu`；离开中按钮禁用 |
+
+入房后角色生成与昵称同步由 `PlayerSpawner` / `NetworkPlayer` 自动完成，**不是**房间页按钮操作。
+
+#### C. 首期明确不做的房间 UI
+
+技术方案中的 MasterClient 房间元数据（关房、改 `IsOpen`/`phase`）、踢人、准备/开始战斗、房主专属面板等，**首期不提供 UI**；后续若做，仍须经 Coordinator / MasterClient 协调，UI 不得直写 `[Networked]` 或 `SessionInfo`。
 
 ### Runner 唯一性与 Play 场景变更
 
